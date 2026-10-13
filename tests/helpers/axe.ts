@@ -2,10 +2,17 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Page, TestInfo } from "@playwright/test";
 import type { Result } from "axe-core";
 
-// Only run the rules that map to WCAG 2.0/2.1 levels A and AA.
+// Only run the rules that map to WCAG 2.0/2.1/2.2 levels A and AA.
 // A: WCAG minimum baseline
 // AA: WCAG Standard Benchmark
-const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
+const WCAG_TAGS = [
+  "wcag2a",
+  "wcag2aa",
+  "wcag21a",
+  "wcag21aa",
+  "wcag22a",
+  "wcag22aa",
+];
 
 /**
  * Runs axe against the page as it is *right now* and returns the violations.
