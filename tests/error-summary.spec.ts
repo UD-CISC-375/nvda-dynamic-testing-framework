@@ -79,8 +79,17 @@ test("broken: errors appear but NVDA is never told about them", async ({
 
   // ...but there's no summary, focus never leaves Submit, and the inputs
   // aren't marked invalid or linked to their errors. NVDA says nothing.
+  //
+  // These checks pin down the flaw itself, so this test FAILS if Team Y ever
+  // fixes the broken page (on purpose or by accident). That's how we know
+  // the test really detects the problem instead of passing no matter what.
+  // Each fix trips its own check:
+
+  // Fail if Team Y adds an error summary.
   await expect(page.getByTestId("error-summary")).toHaveCount(0);
+  // Fail if Team Y moves focus off Submit (e.g. to a summary or a field).
   await expect(trigger).toBeFocused();
+  // Fail if Team Y sets aria-invalid or links the inputs to their errors.
   await expect(name).not.toHaveAttribute("aria-invalid");
   await expect(name).toHaveAccessibleDescription("");
   await expect(email).not.toHaveAttribute("aria-invalid");
