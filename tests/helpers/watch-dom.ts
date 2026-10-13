@@ -85,7 +85,7 @@ export async function watchDom(page: Page, rootSelector: string) {
       attributes: true, // attribute added / changed / removed
       attributeOldValue: true, // also record the value before the change
       childList: true, // elements inserted / removed
-      characterData: true, // text edited in place (React often does this)
+      characterData: true, // text edited in place (e.g. React updating a {message} slot)
       characterDataOldValue: true,
     });
   }, rootSelector);
