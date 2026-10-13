@@ -5,7 +5,7 @@ This repository is going to be used to develop the testing framework for NVDA. T
 ## Menu button: accessibility before and after a DOM change
 
 The first scenario we test is Team Y's menu button:
-https://mlorang.github.io/nvda-dynamic-testing-webpage/#/disclosure/menu?variant=accessible
+[https://mlorang.github.io/nvda-dynamic-testing-webpage/#/disclosure/menu?variant=accessible](https://ud-cisc-375.github.io/nvda-dynamic-testing-webpage/#/disclosure/menu?variant=accessible)
 
 For each variant (`accessible` and `broken`) the test:
 
