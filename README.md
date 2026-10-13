@@ -67,6 +67,6 @@ For each variant the test focuses Submit and presses Enter with both fields empt
 
 - `playwright.config.ts`: points Playwright at Team Y's site (`baseURL`) and defines the `chromium` (automatic) and `manual` projects.
 - `tests/menu.spec.ts`: the menu tests.
-- `tests/error-summary.spec.ts`: the error summary tests.
-- `tests/helpers/axe.ts`: `runAxe()` (scan + report attachment) and `diffViolations()` (violations that are new since the before scan).
-- `tests/helpers/watch-dom.ts`: `watchDom()`, a MutationObserver in the page that reports each change back to the test, and `waitFor()`, which waits until the change we expect has happened.
+- `tests/loading.spec.ts`: the loading indicator tests.
+- `tests/helpers/axe.ts`: `runAxe()` (scan against WCAG 2.0/2.1/2.2 A and AA rules, plus report attachment) and `diffViolations()` (violations that are new since the before scan).
+- `tests/helpers/watch-dom.ts`: `watchDom()`, a MutationObserver in the page that reports each change back to the test, and `waitFor()`, which waits until the change we expect has happened. Each change records its text and whether it happened inside a live region.
