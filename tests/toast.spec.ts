@@ -4,8 +4,8 @@ import { watchDom, DomChange } from "./helpers/watch-dom";
 
 // The toast scenario on Team Y's site (WCAG 4.1.3 Status Messages).
 // accessible should pass all of our checks.
-// broken passes axe, but we assert what the failure is: the toast region has
-// no role="status", so a screen reader has no live region to watch.
+// broken will still pass axe, but we assert what the failure is: the toast
+// region has no role="status", so a screen reader has no live region to watch.
 const toastUrl = (variant: "accessible" | "broken") =>
   `#/live/toast?variant=${variant}`;
 
@@ -14,19 +14,25 @@ const toastUrl = (variant: "accessible" | "broken") =>
 const SCENARIO = '[data-testid="scenario-root"]';
 
 // The form resets its textarea on submit; that's not the toast.
+const isToastChange = (c: DomChange) => c.target !== "textarea#message";
+
 const toastInserted = (changes: DomChange[]) =>
   changes.some(
-    (c) =>
-      c.target !== "textarea#message" &&
-      c.type === "childList" &&
-      c.added.length > 0,
+    (c) => isToastChange(c) && c.type === "childList" && c.added.length > 0,
+  );
+
+const toastRemoved = (changes: DomChange[]) =>
+  changes.some(
+    (c) => isToastChange(c) && c.type === "childList" && c.removed.length > 0,
   );
 
 // Sends the message. In the "chromium" project Playwright clicks for us; in
 // the "manual" project we wait for a person to click in the visible browser.
+// Either way the watcher started earlier sees the same DOM change.
 async function clickTrigger(page: Page, testInfo: TestInfo) {
   if (testInfo.project.name === "manual") {
     console.log(">>> Click 'Send message' in the browser window <<<");
+    // This only waits for the human. The watcher still does the detecting.
     await expect(page.getByTestId("toast-region")).toContainText(/.+/, {
       timeout: testInfo.timeout,
     });
@@ -68,9 +74,13 @@ test("accessible: toast is injected into an existing live region and stays clean
   // 3. Start watching BEFORE the click so the change can't slip past us.
   const watcher = await watchDom(page, SCENARIO);
 
-  // 4. Cause the change, then wait for the toast to be inserted.
+  // 4. Cause the change (automatically, or by a person in manual mode).
   await clickTrigger(page, testInfo);
-  await watcher.waitFor(toastInserted);
+
+  // 5. Wait until the observer has reported the toast being inserted.
+  const changes = await watcher.waitFor(toastInserted);
+  console.log("[dom] detected:", changes);
+  await expect(toastRegion).toContainText(/.+/);
 
   // The message went into the SAME element that was already in the DOM.
   const samePersisted = await page.evaluate(() => {
@@ -84,14 +94,15 @@ test("accessible: toast is injected into an existing live region and stays clean
   expect(samePersisted).toBe(true);
   await expect(toastRegion).toHaveAttribute("role", "status");
 
-  // 5. Same scan again, against the new state of the page.
+  // 6. Same scan again, against the new state of the page.
   const after = await runAxe(page, testInfo, "after");
   expect(after.map((v) => v.id)).toEqual([]);
   expect(diffViolations(before, after)).toEqual([]);
 
-  // 6. The toast auto-dismisses; the region stays in the DOM (toBeEmpty
-  //    would fail if the element were gone).
+  // 7. The toast auto-dismisses; the live region itself stays in the DOM.
+  await watcher.waitFor(toastRemoved, 15_000);
   await expect(toastRegion).toBeEmpty({ timeout: 15_000 });
+  await expect(toastRegion).toHaveAttribute("role", "status");
 });
 
 test("broken: toast region is NOT a live region", async ({
@@ -100,6 +111,10 @@ test("broken: toast region is NOT a live region", async ({
   await page.goto(toastUrl("broken"));
   const toastRegion = page.getByTestId("toast-region");
   await expect(page.getByTestId("trigger")).toBeVisible();
+
+  // axe has nothing to flag here: an empty <div> is valid markup.
+  const before = await runAxe(page, testInfo, "before");
+  console.log("[axe] baseline violations:", before.map((v) => v.id));
 
   // The bug: no role="status" (or aria-live) exists before the click, so
   // there is no live region for a screen reader to be watching.
@@ -111,11 +126,22 @@ test("broken: toast region is NOT a live region", async ({
 
   // The click DOES change the DOM (the toast is inserted)...
   await watcher.waitFor(toastInserted);
+  await expect(toastRegion).toContainText(/.+/);
 
-  // ...but no existing element ever becomes a live region.
-  expect(
-    watcher.changes.filter(
-      (c) => c.attributeName === "role" || c.attributeName === "aria-live",
-    ),
-  ).toEqual([]);
+  // ...but no existing element ever becomes a live region: nothing has its
+  // role / aria-live attribute set after the fact.
+  const liveRegionAttrChanges = watcher.changes.filter(
+    (c) => c.attributeName === "role" || c.attributeName === "aria-live",
+  );
+  expect(liveRegionAttrChanges).toEqual([]);
+  await expect(toastRegion).not.toHaveAttribute("role", "status");
+  console.log(
+    "[dom] changes:",
+    watcher.changes,
+    "\n[dom] region after click:",
+    await toastRegion.evaluate((el) => el.outerHTML),
+  );
+
+  const after = await runAxe(page, testInfo, "after");
+  console.log("[axe] new since baseline:", diffViolations(before, after));
 });
