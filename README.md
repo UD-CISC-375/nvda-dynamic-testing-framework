@@ -62,10 +62,24 @@ Clicking "Load results" shows a spinner, then 5 results. Tests use `?delay=3000`
 
 In the broken variant, axe only catches the problem *during* loading. A scan after loading is clean, even though a screen reader user was never told anything happened.
 
+## Submission confirmation: announcement and focus after sending a form
+
+https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/#/forms/success?variant=accessible
+
+Sending feedback changes the button to "Sending…", then shows a confirmation. Tests use `?delay=3000` so the "Sending…" state lasts long enough to check. Each variant fills in the feedback, focuses the Send button and presses Enter. The tests use the keyboard, not `.click()`, so the focus checks mean something.
+
+| Variant | Live region | Confirmation announced? | Form after sending | Focus after sending | axe |
+|---|---|---|---|---|---|
+| accessible | `role="status"`, there and empty from page load | Yes: "Thanks! Your feedback was submitted." in the status region | Still there, textarea cleared | Stays on the Send button | 0 violations |
+| broken | None | No | Replaced by the message | Falls back to `<body>` | 0 violations |
+
+**axe can't detect this flaw** (manifest: `nvdaOnly: true`). The broken page is clean to axe, but a screen reader says nothing, and a keyboard user loses their place. Only checking the live region and `document.activeElement` catches it.
+
 ### Files
 
 - `playwright.config.ts`: points Playwright at Team Y's site (`baseURL`) and defines the `chromium` (automatic) and `manual` projects.
 - `tests/menu.spec.ts`: the menu tests.
 - `tests/loading.spec.ts`: the loading indicator tests.
+- `tests/submission-confirmation.spec.ts`: the submission confirmation tests.
 - `tests/helpers/axe.ts`: `runAxe()` (scan against WCAG 2.0/2.1/2.2 A and AA rules, plus report attachment) and `diffViolations()` (violations that are new since the before scan).
 - `tests/helpers/watch-dom.ts`: `watchDom()`, a MutationObserver in the page that reports each change back to the test, and `waitFor()`, which waits until the change we expect has happened. Each change records its text and whether it happened inside a live region.
