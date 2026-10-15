@@ -14,7 +14,7 @@ async function openTabs(page: Page, variant: "accessible" | "broken") {
   await expect(page.getByTestId("scenario-root")).toBeVisible();
 }
 
-test(c, async ({ page }) => {
+test("tab page loads", async ({ page }) => {
   await openTabs(page, "accessible");
   const tabs = page.getByRole("tablist").getByRole("tab");
   expect(await tabs.count()).toBeGreaterThan(1);
