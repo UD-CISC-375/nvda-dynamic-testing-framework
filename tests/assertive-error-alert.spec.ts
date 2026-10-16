@@ -95,3 +95,58 @@ test("accessible: error is announced through an assertive alert", async ({
   expect(after.map((v) => v.id)).toEqual([]);
   expect(diffViolations(before, after)).toEqual([]);
 });
+
+
+
+test("broken: error is not announced through an assertive live region", async ({
+  page,
+}, testInfo) => {
+  await page.goto(alertUrl("broken"));
+
+  // run axe-core before triggering the error
+  const before = await runAxe(page, testInfo, "before");
+  expect(before.map((v) => v.id)).toEqual([]);
+
+  // start watching DOM changes before the interaction
+  const watcher = await watchDom(
+    page,
+    '[data-testid="scenario-root"]'
+  );
+
+  // trigger the simulated save failure
+  await clickTrigger(page, testInfo);
+
+  // verify the error is visually displayed
+  await expect(page.getByTestId("error-text"))
+    .toHaveText(expectedError);
+
+  // the broken version explicitly disables live announcements
+  await expect(page.getByTestId("alert"))
+    .toHaveAttribute("aria-live", "off");
+
+  // the broken version does not use role="alert"
+  await expect(page.getByTestId("alert"))
+    .not.toHaveAttribute("role", "alert");
+
+  // verify the error was not detected inside a live region
+  await expect(
+    watcher.waitFor(announced(expectedError), 1000)
+  ).rejects.toThrow("expected change not seen");
+
+  expect(
+    watcher.changes.filter((change) => change.inLiveRegion)
+  ).toEqual([]);
+
+  console.log("[dom] broken alert changes:", watcher.changes);
+
+  // run axe-core after the error appears
+  const after = await runAxe(page, testInfo, "after");
+
+  console.log(
+    "[axe] new violations since baseline:",
+    diffViolations(before, after)
+  );
+
+  expect(after.map((v) => v.id)).toEqual([]);
+  expect(diffViolations(before, after)).toEqual([]);
+});
