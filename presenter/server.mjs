@@ -40,7 +40,9 @@ const server = createServer(async (req, res) => {
     const child = spawn(process.execPath, [PLAYWRIGHT_CLI, ...TEST_ARGS], {
       cwd: ROOT,
       // FORCE_COLOR=0: no terminal color codes in any error text sent to the page.
-      env: { ...process.env, FORCE_COLOR: "0" },
+      // SLOW_MO=500: playwright.config.ts pauses 500 ms before each browser
+      // action, so the audience can see the menu open.
+      env: { ...process.env, FORCE_COLOR: "0", SLOW_MO: "500" },
     });
     // Collect all output; the JSON is only complete once Playwright exits.
     let stdout = "";

@@ -12,6 +12,9 @@ export default defineConfig({
     // The trailing slash matters: without it the relative URL would replace
     // "nvda-dynamic-testing-webpage" instead of being appended after it.
     baseURL: 'https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/',
+    // Pause this many ms before each browser action so people can watch.
+    // Unset (0) normally; the presenter server (presenter/server.mjs) sets it.
+    launchOptions: { slowMo: Number(process.env.SLOW_MO) || 0 },
   },
   projects: [
     // Default: Playwright clicks the menu button itself.
