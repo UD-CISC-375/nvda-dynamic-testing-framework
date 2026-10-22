@@ -13,23 +13,39 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 // Playwright's command-line entry point. Running it with `node` directly avoids
 // npx, which on Windows is a .cmd file that spawn() can't start without a shell.
 const PLAYWRIGHT_CLI = path.join(ROOT, "node_modules", "@playwright", "test", "cli.js");
-// Like `npm run test:headed` (visible browser), limited to the accessibility-tree
-// diff spec. The JSON reporter prints the whole run, attachments included, as one
-// JSON document on stdout, which is easier to pick the diffs out of than plain text.
-const TEST_ARGS = ["test", "menu-aria-tree.spec.ts", "--project=chromium", "--headed", "--reporter=json"];
+// Which spec file each button runs. The page picks one with /run?suite=<name>.
+const SUITES = {
+  "aria-tree": "menu-aria-tree.spec.ts",
+  "watch-dom": "menu.spec.ts",
+};
+// Like `npm run test:headed` (visible browser), limited to one spec file.
+// The JSON reporter prints the whole run, attachments included, as one JSON
+// document on stdout, which is easier to pick the results out of than plain text.
+const testArgs = (specFile) => ["test", specFile, "--project=chromium", "--headed", "--reporter=json"];
 
 // Only one run at a time; a second click while running is refused.
 let running = false;
 
 const server = createServer(async (req, res) => {
-  if (req.method === "GET" && req.url === "/") {
+  // Split "/run?suite=watch-dom" into its path and query. req.url has no host,
+  // and URL() needs one, so any placeholder host will do.
+  const url = new URL(req.url, "http://localhost");
+
+  if (req.method === "GET" && url.pathname === "/") {
     const html = await readFile(new URL("index.html", import.meta.url));
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(html);
     return;
   }
 
-  if (req.method === "POST" && req.url === "/run") {
+  if (req.method === "POST" && url.pathname === "/run") {
+    // No ?suite= means aria-tree, the page's original button.
+    const specFile = SUITES[url.searchParams.get("suite") ?? "aria-tree"];
+    if (!specFile) {
+      res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end(`Unknown suite. Use one of: ${Object.keys(SUITES).join(", ")}.\n`);
+      return;
+    }
     if (running) {
       res.writeHead(409, { "Content-Type": "text/plain; charset=utf-8" });
       res.end("Tests are already running.\n");
@@ -37,7 +53,7 @@ const server = createServer(async (req, res) => {
     }
     running = true;
 
-    const child = spawn(process.execPath, [PLAYWRIGHT_CLI, ...TEST_ARGS], {
+    const child = spawn(process.execPath, [PLAYWRIGHT_CLI, ...testArgs(specFile)], {
       cwd: ROOT,
       // FORCE_COLOR=0: no terminal color codes in any error text sent to the page.
       // SLOW_MO=500: playwright.config.ts pauses 500 ms before each browser
@@ -70,8 +86,13 @@ const server = createServer(async (req, res) => {
   res.end("Not found\n");
 });
 
-// Turn Playwright's JSON report into [{ title, status, error, added, removed }],
-// one entry per test, keeping only what the page shows.
+// Read a JSON attachment's body, which the report stores in base64.
+const decode = (attachment) => JSON.parse(Buffer.from(attachment.body, "base64").toString("utf8"));
+
+// Turn Playwright's JSON report into
+// [{ title, status, error, added, removed, changes }], one entry per test,
+// keeping only what the page shows. added/removed come from the aria-tree
+// spec, changes from the watch-dom one; whichever a test didn't attach is [].
 function summarize(report) {
   const tests = [];
   // Suites can nest (file > describe > ...), so walk them recursively.
@@ -82,9 +103,9 @@ function summarize(report) {
         const result = test.results.at(-1);
         // The spec attaches its diff as "tree-<variant>-diff.json", body in base64.
         const diffAttachment = result.attachments.find((a) => /^tree-.*-diff\.json$/.test(a.name));
-        const diff = diffAttachment
-          ? JSON.parse(Buffer.from(diffAttachment.body, "base64").toString("utf8"))
-          : { added: [], removed: [] };
+        const diff = diffAttachment ? decode(diffAttachment) : { added: [], removed: [] };
+        // The watch-dom spec attaches its recorded changes as "dom-changes.json".
+        const changesAttachment = result.attachments.find((a) => a.name === "dom-changes.json");
         tests.push({
           title: spec.title,
           status: result.status,
@@ -92,6 +113,7 @@ function summarize(report) {
           error: result.errors[0]?.message?.split("\n")[0],
           added: diff.added,
           removed: diff.removed,
+          changes: changesAttachment ? decode(changesAttachment) : [],
         });
       }
     }
