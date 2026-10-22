@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Run accessibility-tree tests</title>
+  <title>Run accessibility tests</title>
   <style>
     body { font-family: system-ui, sans-serif; margin: 2rem; }
     button { font-size: 1.25rem; padding: 0.75rem 1.5rem; }
@@ -15,12 +15,14 @@
 </head>
 <body>
   <main>
-    <button id="run" type="button">Run accessibility-tree tests</button>
+    <!-- data-suite is sent to the server as /run?suite=..., see SUITES in server.mjs. -->
+    <button type="button" data-suite="aria-tree">Run accessibility-tree tests</button>
+    <button type="button" data-suite="watch-dom">Run watch-dom tests</button>
     <p id="status" role="status"></p>
     <div id="results"></div>
   </main>
   <script>
-    const button = document.getElementById("run");
+    const buttons = document.querySelectorAll("button[data-suite]");
     const status = document.getElementById("status");
     const results = document.getElementById("results");
 
@@ -37,16 +39,42 @@
       return [h, ul];
     }
 
-    button.addEventListener("click", async () => {
-      button.disabled = true;
+    // An attribute value as shown on the page; null means the attribute isn't there.
+    const value = (v) => (v === null ? "(absent)" : JSON.stringify(v));
+
+    // One DomChange (see watch-dom.ts) as a readable line, e.g.
+    // 'button#actions-button: aria-expanded "false" → "true"'.
+    function describeChange(c) {
+      let line;
+      if (c.type === "attributes") {
+        line = `${c.target}: ${c.attributeName} ${value(c.oldValue)} → ${value(c.newValue)}`;
+      } else if (c.type === "childList") {
+        const parts = [];
+        if (c.added.length) parts.push(`inserted ${c.added.join(", ")}`);
+        if (c.removed.length) parts.push(`removed ${c.removed.join(", ")}`);
+        line = `${c.target}: ${parts.join("; ")}`;
+      } else {
+        line = `${c.target}: text now ${JSON.stringify(c.text)}`;
+      }
+      // Changes inside a live region are the ones a screen reader announces.
+      return c.inLiveRegion ? `${line} (live region)` : line;
+    }
+
+    // Both buttons run the same way; only the suite they ask for differs.
+    const setDisabled = (disabled) => buttons.forEach((b) => (b.disabled = disabled));
+
+    for (const button of buttons) button.addEventListener("click", async () => {
+      const suite = button.dataset.suite;
+      // The server runs one suite at a time, so block both buttons.
+      setDisabled(true);
       results.textContent = "";
       status.textContent = "Running tests…";
       // Ask the local server (server.mjs) to run Playwright; it answers when done.
-      const res = await fetch("/run", { method: "POST" });
+      const res = await fetch(`/run?suite=${suite}`, { method: "POST" });
       if (!res.ok) {
         // Error replies (already running, Playwright crashed) are plain text.
         status.textContent = await res.text();
-        button.disabled = false;
+        setDisabled(false);
         return;
       }
       const { tests } = await res.json();
@@ -66,10 +94,14 @@
           p.textContent = test.error;
           section.append(p);
         }
-        section.append(...lineList("Added", test.added), ...lineList("Removed", test.removed));
+        if (suite === "watch-dom") {
+          section.append(...lineList("DOM changes", test.changes.map(describeChange)));
+        } else {
+          section.append(...lineList("Added", test.added), ...lineList("Removed", test.removed));
+        }
         results.append(section);
       }
-      button.disabled = false;
+      setDisabled(false);
     });
   </script>
 </body>
