@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Page, TestInfo } from "@playwright/test";
 
 /** One DOM change, copied out of the browser as plain data. */
 export type DomChange = {
@@ -117,4 +117,15 @@ export async function watchDom(page: Page, rootSelector: string) {
       });
     },
   };
+}
+
+/**
+ * Puts the recorded changes into the report as "dom-changes.json", so the
+ * presenter page (and npx playwright show-report) can show them.
+ */
+export async function attachDomChanges(testInfo: TestInfo, changes: DomChange[]) {
+  await testInfo.attach("dom-changes.json", {
+    body: JSON.stringify(changes, null, 2),
+    contentType: "application/json",
+  });
 }

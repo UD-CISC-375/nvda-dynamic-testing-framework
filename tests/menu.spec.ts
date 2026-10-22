@@ -1,6 +1,6 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
-import { watchDom, DomChange } from "./helpers/watch-dom";
+import { watchDom, attachDomChanges, DomChange } from "./helpers/watch-dom";
 
 // The menu scenario on Team Y's site. The site uses hash routing, so the
 // "page" lives after the # and the server always serves the same index.html.
@@ -71,6 +71,7 @@ test("accessible: opening the menu is detected and stays clean", async ({
   // 4. Wait until the observer has reported the change we care about.
   const changes = await watcher.waitFor(menuOpened);
   console.log("[dom] detected:", changes);
+  await attachDomChanges(testInfo, changes);
 
   // 5. Same scan again, against the new state of the page.
   const after = await runAxe(page, testInfo, "after");
@@ -99,6 +100,7 @@ test("broken: opening the menu is NOT announced as a state change", async ({
     "expected change not seen",
   );
   console.log("[dom] expected 'expanded' signal NOT seen. Only these changes happened:", watcher.changes);
+  await attachDomChanges(testInfo, watcher.changes);
 
   const after = await runAxe(page, testInfo, "after");
   expect(after.map((v) => v.id)).toContain("button-name");
