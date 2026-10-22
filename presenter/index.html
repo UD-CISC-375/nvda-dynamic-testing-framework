@@ -39,25 +39,35 @@
       return [h, ul];
     }
 
-    // An attribute value as shown on the page; null means the attribute isn't there.
-    const value = (v) => (v === null ? "(absent)" : JSON.stringify(v));
+    // An attribute as shown in a line: [hidden] when it has no value,
+    // otherwise [aria-expanded="true"].
+    const attr = (name, v) => (v === "" ? `[${name}]` : `[${name}=${JSON.stringify(v)}]`);
 
-    // One DomChange (see watch-dom.ts) as a readable line, e.g.
-    // 'button#actions-button: aria-expanded "false" → "true"'.
-    function describeChange(c) {
-      let line;
-      if (c.type === "attributes") {
-        line = `${c.target}: ${c.attributeName} ${value(c.oldValue)} → ${value(c.newValue)}`;
-      } else if (c.type === "childList") {
-        const parts = [];
-        if (c.added.length) parts.push(`inserted ${c.added.join(", ")}`);
-        if (c.removed.length) parts.push(`removed ${c.removed.join(", ")}`);
-        line = `${c.target}: ${parts.join("; ")}`;
-      } else {
-        line = `${c.target}: text now ${JSON.stringify(c.text)}`;
+    // Turn the watcher's changes (see DomChange in watch-dom.ts) into the same
+    // { added, removed } lines as the aria-tree diff: each change's "before"
+    // goes in removed, its "after" in added. Unlike the tree diff, this lists
+    // events, not a before/after comparison, so something that changes and
+    // then changes back shows up in both lists.
+    function domDiff(changes) {
+      const added = [];
+      const removed = [];
+      for (const c of changes) {
+        // Changes inside a live region are the ones a screen reader announces.
+        const live = c.inLiveRegion ? " (live region)" : "";
+        if (c.type === "attributes") {
+          // null means the attribute wasn't there (old) or was taken away (new).
+          if (c.oldValue !== null) removed.push(`- ${c.target} ${attr(c.attributeName, c.oldValue)}${live}`);
+          if (c.newValue !== null) added.push(`- ${c.target} ${attr(c.attributeName, c.newValue)}${live}`);
+        } else if (c.type === "childList") {
+          for (const node of c.added) added.push(`- ${node} (in ${c.target})${live}`);
+          for (const node of c.removed) removed.push(`- ${node} (in ${c.target})${live}`);
+        } else {
+          // characterData: text edited in place.
+          removed.push(`- ${c.target} text ${JSON.stringify(c.oldValue)}${live}`);
+          added.push(`- ${c.target} text ${JSON.stringify(c.text)}${live}`);
+        }
       }
-      // Changes inside a live region are the ones a screen reader announces.
-      return c.inLiveRegion ? `${line} (live region)` : line;
+      return { added, removed };
     }
 
     // Both buttons run the same way; only the suite they ask for differs.
@@ -94,11 +104,9 @@
           p.textContent = test.error;
           section.append(p);
         }
-        if (suite === "watch-dom") {
-          section.append(...lineList("DOM changes", test.changes.map(describeChange)));
-        } else {
-          section.append(...lineList("Added", test.added), ...lineList("Removed", test.removed));
-        }
+        // The aria-tree tests come with added/removed; the watch-dom ones are built from changes.
+        const { added, removed } = suite === "watch-dom" ? domDiff(test.changes) : test;
+        section.append(...lineList("Added", added), ...lineList("Removed", removed));
         results.append(section);
       }
       setDisabled(false);
