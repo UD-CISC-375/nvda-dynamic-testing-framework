@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Run accessibility-tree tests</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; }
+    button { font-size: 1.25rem; padding: 0.75rem 1.5rem; }
+    pre { background: #f4f4f4; padding: 1rem; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <main>
+    <button id="run" type="button">Run accessibility-tree tests</button>
+    <pre id="output" aria-live="polite"></pre>
+  </main>
+  <script>
+    const button = document.getElementById("run");
+    const output = document.getElementById("output");
+
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      output.textContent = "";
+      // Ask the local server (server.mjs) to start a Playwright run.
+      const res = await fetch("/run", { method: "POST" });
+      // Read the response piece by piece so test output shows up while it runs.
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        output.textContent += decoder.decode(value, { stream: true });
+      }
+      button.disabled = false;
+    });
+  </script>
+</body>
+</html>
