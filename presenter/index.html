@@ -6,30 +6,68 @@
   <style>
     body { font-family: system-ui, sans-serif; margin: 2rem; }
     button { font-size: 1.25rem; padding: 0.75rem 1.5rem; }
-    pre { background: #f4f4f4; padding: 1rem; white-space: pre-wrap; }
+    section { margin-top: 1.5rem; }
+    /* No bullets: each tree line already starts with "- ". */
+    ul { background: #f4f4f4; padding: 0.75rem 1rem; list-style: none; font-family: monospace; font-size: 1.1rem; }
+    .passed { color: #1a7f37; }
+    .failed { color: #b00020; }   /* same red as signup-fixed.html */
   </style>
 </head>
 <body>
   <main>
     <button id="run" type="button">Run accessibility-tree tests</button>
-    <pre id="output" aria-live="polite"></pre>
+    <p id="status" role="status"></p>
+    <div id="results"></div>
   </main>
   <script>
     const button = document.getElementById("run");
-    const output = document.getElementById("output");
+    const status = document.getElementById("status");
+    const results = document.getElementById("results");
+
+    // Build an <h3> plus a <ul> of tree lines (or "(none)").
+    function lineList(heading, lines) {
+      const h = document.createElement("h3");
+      h.textContent = heading;
+      const ul = document.createElement("ul");
+      for (const line of lines.length ? lines : ["(none)"]) {
+        const li = document.createElement("li");
+        li.textContent = line;
+        ul.append(li);
+      }
+      return [h, ul];
+    }
 
     button.addEventListener("click", async () => {
       button.disabled = true;
-      output.textContent = "";
-      // Ask the local server (server.mjs) to start a Playwright run.
+      results.textContent = "";
+      status.textContent = "Running tests…";
+      // Ask the local server (server.mjs) to run Playwright; it answers when done.
       const res = await fetch("/run", { method: "POST" });
-      // Read the response piece by piece so test output shows up while it runs.
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        output.textContent += decoder.decode(value, { stream: true });
+      if (!res.ok) {
+        // Error replies (already running, Playwright crashed) are plain text.
+        status.textContent = await res.text();
+        button.disabled = false;
+        return;
+      }
+      const { tests } = await res.json();
+      const failed = tests.filter((t) => t.status !== "passed").length;
+      status.textContent = failed ? `${failed} of ${tests.length} tests failed.` : `All ${tests.length} tests passed.`;
+
+      for (const test of tests) {
+        const section = document.createElement("section");
+        const h2 = document.createElement("h2");
+        const passed = test.status === "passed";
+        h2.textContent = `${passed ? "✓" : "✗"} ${test.title}`;
+        h2.className = passed ? "passed" : "failed";
+        section.append(h2);
+        if (test.error) {
+          const p = document.createElement("p");
+          p.className = "failed";
+          p.textContent = test.error;
+          section.append(p);
+        }
+        section.append(...lineList("Added", test.added), ...lineList("Removed", test.removed));
+        results.append(section);
       }
       button.disabled = false;
     });
