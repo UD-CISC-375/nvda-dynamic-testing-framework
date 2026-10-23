@@ -65,7 +65,8 @@
       // The server runs one suite at a time, so block both buttons.
       setDisabled(true);
       results.textContent = "";
-      status.textContent = "Running tests…";
+      // The server runs the "manual" project, so Playwright waits for a person to click.
+      status.textContent = "Running tests… Click the menu button each time the test browser shows the menu page.";
       // Ask the local server (server.mjs) to run Playwright; it answers when done.
       const res = await fetch(`/run?suite=${suite}`, { method: "POST" });
       if (!res.ok) {

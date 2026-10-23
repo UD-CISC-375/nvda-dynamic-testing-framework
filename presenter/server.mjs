@@ -18,10 +18,11 @@ const SUITES = {
   "aria-tree": "menu-aria-tree.spec.ts",
   "watch-dom": "menu.spec.ts",
 };
-// Like `npm run test:headed` (visible browser), limited to one spec file.
-// The JSON reporter prints the whole run, attachments included, as one JSON
-// document on stdout, which is easier to pick the results out of than plain text.
-const testArgs = (specFile) => ["test", specFile, "--project=chromium", "--headed", "--reporter=json"];
+// Like `npm run test:manual`, limited to one spec file: a visible browser opens
+// and the presenter clicks the menu button themselves (see clickTrigger in the
+// specs). The JSON reporter prints the whole run, attachments included, as one
+// JSON document on stdout, which is easier to pick the results out of than plain text.
+const testArgs = (specFile) => ["test", specFile, "--project=manual", "--reporter=json"];
 
 // Only one run at a time; a second click while running is refused.
 let running = false;
