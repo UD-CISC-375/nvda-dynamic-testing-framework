@@ -13,16 +13,19 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 // Playwright's command-line entry point. Running it with `node` directly avoids
 // npx, which on Windows is a .cmd file that spawn() can't start without a shell.
 const PLAYWRIGHT_CLI = path.join(ROOT, "node_modules", "@playwright", "test", "cli.js");
-// Which spec file each button runs. The page picks one with /run?suite=<name>.
+// Which tests each button runs. The page picks one with /run?suite=<name>.
 const SUITES = {
-  "aria-tree": "menu-aria-tree.spec.ts",
-  "watch-dom": "menu.spec.ts",
+  "aria-tree": ["menu-aria-tree.spec.ts"],
+  // --grep-invert skips tests whose title matches. "menu page loads" only
+  // checks the starting state, and its window opening and closing right
+  // before the first test looked like a click nobody made.
+  "watch-dom": ["menu.spec.ts", "--grep-invert", "menu page loads"],
 };
-// Like `npm run test:manual`, limited to one spec file: a visible browser opens
+// Like `npm run test:manual`, limited to one suite: a visible browser opens
 // and the presenter clicks the menu button themselves (see clickTrigger in the
 // specs). The JSON reporter prints the whole run, attachments included, as one
 // JSON document on stdout, which is easier to pick the results out of than plain text.
-const testArgs = (specFile) => ["test", specFile, "--project=manual", "--reporter=json"];
+const testArgs = (suiteArgs) => ["test", ...suiteArgs, "--project=manual", "--reporter=json"];
 
 // Only one run at a time; a second click while running is refused.
 let running = false;
@@ -41,8 +44,8 @@ const server = createServer(async (req, res) => {
 
   if (req.method === "POST" && url.pathname === "/run") {
     // No ?suite= means aria-tree, the page's original button.
-    const specFile = SUITES[url.searchParams.get("suite") ?? "aria-tree"];
-    if (!specFile) {
+    const suiteArgs = SUITES[url.searchParams.get("suite") ?? "aria-tree"];
+    if (!suiteArgs) {
       res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
       res.end(`Unknown suite. Use one of: ${Object.keys(SUITES).join(", ")}.\n`);
       return;
@@ -54,7 +57,7 @@ const server = createServer(async (req, res) => {
     }
     running = true;
 
-    const child = spawn(process.execPath, [PLAYWRIGHT_CLI, ...testArgs(specFile)], {
+    const child = spawn(process.execPath, [PLAYWRIGHT_CLI, ...testArgs(suiteArgs)], {
       cwd: ROOT,
       // FORCE_COLOR=0: no terminal color codes in any error text sent to the page.
       // SLOW_MO=500: playwright.config.ts pauses 500 ms before each browser

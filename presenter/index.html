@@ -76,8 +76,7 @@
         setDisabled(false);
         return;
       }
-      // "menu page loads" (menu.spec.ts) only checks the starting state, so it isn't shown.
-      const tests = (await res.json()).tests.filter((t) => t.title !== "menu page loads");
+      const { tests } = await res.json();
       const failed = tests.filter((t) => t.status !== "passed").length;
       status.textContent = failed ? `${failed} of ${tests.length} tests failed.` : `All ${tests.length} tests passed.`;
 
