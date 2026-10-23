@@ -39,33 +39,20 @@
       return [h, ul];
     }
 
-    // An attribute as shown in a line: [hidden] when it has no value,
-    // otherwise [aria-expanded="true"].
-    const attr = (name, v) => (v === "" ? `[${name}]` : `[${name}=${JSON.stringify(v)}]`);
-
-    // Turn the watcher's changes (see DomChange in watch-dom.ts) into the same
-    // { added, removed } lines as the aria-tree diff: each change's "before"
-    // goes in removed, its "after" in added. Unlike the tree diff, this lists
-    // events, not a before/after comparison, so something that changes and
-    // then changes back shows up in both lists.
+    // Turn the watcher's changes (see DomChange in watch-dom.ts) into
+    // { added, removed } lines like the aria-tree diff, listing only nodes that
+    // were inserted into or taken out of the page. Attribute changes (e.g.
+    // aria-expanded, hidden) and text edits are left out on purpose: the
+    // accessible menu only changes attributes, so it shows nothing here, while
+    // the aria-tree diff shows the menu appearing.
     function domDiff(changes) {
       const added = [];
       const removed = [];
-      for (const c of changes) {
+      for (const c of changes.filter((c) => c.type === "childList")) {
         // Changes inside a live region are the ones a screen reader announces.
         const live = c.inLiveRegion ? " (live region)" : "";
-        if (c.type === "attributes") {
-          // null means the attribute wasn't there (old) or was taken away (new).
-          if (c.oldValue !== null) removed.push(`- ${c.target} ${attr(c.attributeName, c.oldValue)}${live}`);
-          if (c.newValue !== null) added.push(`- ${c.target} ${attr(c.attributeName, c.newValue)}${live}`);
-        } else if (c.type === "childList") {
-          for (const node of c.added) added.push(`- ${node} (in ${c.target})${live}`);
-          for (const node of c.removed) removed.push(`- ${node} (in ${c.target})${live}`);
-        } else {
-          // characterData: text edited in place.
-          removed.push(`- ${c.target} text ${JSON.stringify(c.oldValue)}${live}`);
-          added.push(`- ${c.target} text ${JSON.stringify(c.text)}${live}`);
-        }
+        for (const node of c.added) added.push(`- ${node} (in ${c.target})${live}`);
+        for (const node of c.removed) removed.push(`- ${node} (in ${c.target})${live}`);
       }
       return { added, removed };
     }
