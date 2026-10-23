@@ -16,8 +16,8 @@
 <body>
   <main>
     <!-- data-suite is sent to the server as /run?suite=..., see SUITES in server.mjs. -->
-    <button type="button" data-suite="aria-tree">Run accessibility-tree tests</button>
     <button type="button" data-suite="watch-dom">Run watch-dom tests</button>
+    <button type="button" data-suite="aria-tree">Run accessibility-tree tests</button>
     <p id="status" role="status"></p>
     <div id="results"></div>
   </main>
@@ -91,9 +91,14 @@
           p.textContent = test.error;
           section.append(p);
         }
-        // The aria-tree tests come with added/removed; the watch-dom ones are built from changes.
-        const { added, removed } = suite === "watch-dom" ? domDiff(test.changes) : test;
-        section.append(...lineList("Added", added), ...lineList("Removed", removed));
+        // The aria-tree tests come with added/removed; the watch-dom ones are built
+        // from changes, and only list elements, so their headings say so.
+        if (suite === "watch-dom") {
+          const { added, removed } = domDiff(test.changes);
+          section.append(...lineList("Elements added", added), ...lineList("Elements removed", removed));
+        } else {
+          section.append(...lineList("Added", test.added), ...lineList("Removed", test.removed));
+        }
         results.append(section);
       }
       setDisabled(false);
