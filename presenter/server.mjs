@@ -91,9 +91,10 @@ const server = createServer(async (req, res) => {
 const decode = (attachment) => JSON.parse(Buffer.from(attachment.body, "base64").toString("utf8"));
 
 // Turn Playwright's JSON report into
-// [{ title, status, error, added, removed, changes }], one entry per test,
-// keeping only what the page shows. added/removed come from the aria-tree
+// [{ title, status, error, added, removed, changes, output }], one entry per
+// test, keeping only what the page shows. added/removed come from the aria-tree
 // spec, changes from the watch-dom one; whichever a test didn't attach is [].
+// output is everything the test printed with console.log.
 function summarize(report) {
   const tests = [];
   // Suites can nest (file > describe > ...), so walk them recursively.
@@ -115,6 +116,14 @@ function summarize(report) {
           added: diff.added,
           removed: diff.removed,
           changes: changesAttachment ? decode(changesAttachment) : [],
+          // The report keeps printed output in chunks, each either plain text
+          // or (rarely) base64 bytes; join them back into one string.
+          output: result.stdout
+            .map((chunk) => chunk.text ?? Buffer.from(chunk.buffer, "base64").toString("utf8"))
+            .join("")
+            // Playwright's workers color printed objects even with FORCE_COLOR=0;
+            // drop the color codes (ESC [ ... m) so the page shows plain text.
+            .replace(/\x1b\[[0-9;]*m/g, ""),
         });
       }
     }

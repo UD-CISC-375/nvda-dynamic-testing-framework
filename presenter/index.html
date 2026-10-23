@@ -9,6 +9,7 @@
     section { margin-top: 1.5rem; }
     /* No bullets: each tree line already starts with "- ". */
     ul { background: #f4f4f4; padding: 0.75rem 1rem; list-style: none; font-family: monospace; font-size: 1.1rem; }
+    pre { background: #f4f4f4; padding: 0.75rem 1rem; font-size: 1.1rem; }
     .passed { color: #1a7f37; }
     .failed { color: #b00020; }   /* same red as signup-fixed.html */
   </style>
@@ -97,6 +98,20 @@
         if (suite === "watch-dom") {
           const { added, removed } = domDiff(test.changes);
           section.append(...lineList("Elements added", added), ...lineList("Elements removed", removed));
+          // Then what the test printed, as in the terminal, minus the manual
+          // mode's ">>> Click the menu button <<<" prompt.
+          const output = test.output
+            .split("\n")
+            .filter((line) => !line.startsWith(">>>"))
+            .join("\n")
+            .trim();
+          if (output) {
+            const h = document.createElement("h3");
+            h.textContent = "Test output";
+            const pre = document.createElement("pre");
+            pre.textContent = output;
+            section.append(h, pre);
+          }
         } else {
           section.append(...lineList("Added", test.added), ...lineList("Removed", test.removed));
         }
