@@ -100,11 +100,16 @@
           const { added, removed } = domDiff(test.changes);
           section.append(...lineList("Elements added", added), ...lineList("Elements removed", removed));
           // Then what the test printed, as in the terminal, minus the manual
-          // mode's ">>> Click the menu button <<<" prompt.
+          // mode's ">>> Click the menu button <<<" prompt and the type, text
+          // and inLiveRegion lines of each printed change.
           const output = test.output
             .split("\n")
             .filter((line) => !line.startsWith(">>>"))
+            .filter((line) => !/^\s*(type|text|inLiveRegion):/.test(line))
             .join("\n")
+            // inLiveRegion was the last field, so the line before it now ends
+            // with a comma right before the closing "}"; drop that comma.
+            .replace(/,(\n\s*\})/g, "$1")
             .trim();
           if (output) {
             const h = document.createElement("h3");
