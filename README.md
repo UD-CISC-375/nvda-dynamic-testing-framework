@@ -5,7 +5,7 @@ This repository is going to be used to develop the testing framework for NVDA. T
 ## Menu button: accessibility before and after a DOM change
 
 The first scenario we test is Team Y's menu button:
-https://mlorang.github.io/nvda-dynamic-testing-webpage/#/disclosure/menu?variant=accessible
+[https://mlorang.github.io/nvda-dynamic-testing-webpage/#/disclosure/menu?variant=accessible](https://ud-cisc-375.github.io/nvda-dynamic-testing-webpage/#/disclosure/menu?variant=accessible)
 
 For each variant (`accessible` and `broken`) the test:
 
@@ -47,25 +47,40 @@ The tests assert these outcomes, so `npm test` passes when the broken variant fa
 
 Note that **axe reports nothing new after the broken menu opens**. axe has no way to know the button should announce "expanded". Only the DOM watcher catches that the screen reader is never told the state changed. A scan before and after on its own is not enough. We also need to check that the right kind of change happened.
 
-## Loading indicator: status messages (WCAG 2.2, 4.1.3)
+## Error summary on submit
 
-https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/#/live/loading?variant=accessible
+The second scenario is Team Y's form error summary:
+https://ud-cisc-375.github.io/nvda-dynamic-testing-webpage/#/forms/error-summary?variant=accessible
 
-Clicking "Load results" shows a spinner, then 5 results. Tests use `?delay=3000` so axe can scan while the spinner is showing. Each variant gets three axe scans (**before**, **during** loading, **after**) and a `MutationObserver` on the scenario root.
+For each variant the test focuses Submit and presses Enter with both fields empty, then checks how the errors are reported. The accessible test also follows the "Enter your name" link and submits again with only the name filled in.
 
-**axe-core has no rule for 4.1.3 Status Messages.** The watcher covers it instead: it marks every change that happens inside a live region (`role="status"`, `alert`, `log`, or `aria-live`) with `inLiveRegion`, and records the text a screen reader would announce in `text`.
+### What the results show
 
-| Variant | Before | During (spinner) | Announced? | After |
+| Variant | Errors visible? | Focus after submit | Inputs | axe |
 |---|---|---|---|---|
-| accessible | 0 violations | 0 (spinner is `aria-hidden`) | Yes: "Loading results…" then "Loaded 5 results" in `role="status"`, `aria-busy` true → false | 0 violations |
-| broken | 0 violations | `svg-img-alt` (spinner is `role="img"` with no name) | No: the spinner and list are inserted, nothing in a live region | 0 violations |
+| accessible | Yes, plus a summary: "There are 2 problems with your submission" with a link per error | Moves to the summary (and again on resubmit, which says "There is 1 problem…") | `aria-invalid="true"`, described by their error message | 0 violations |
+| broken | Yes, next to each field only | Stays on Submit | No `aria-invalid`, no description | 0 violations |
 
-In the broken variant, axe only catches the problem *during* loading. A scan after loading is clean, even though a screen reader user was never told anything happened.
+**axe passes both variants** (this scenario is `nvdaOnly`). The broken page's HTML is valid; what's wrong is that nothing tells NVDA the errors appeared. There's no live region, so focus moving to the summary is the only way NVDA finds out. The tests catch this by checking focus and the inputs' ARIA attributes directly.
+
+## Submission confirmation: announcement and focus after sending a form
+
+https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/#/forms/success?variant=accessible
+
+Sending feedback changes the button to "Sending…", then shows a confirmation. Tests use `?delay=3000` so the "Sending…" state lasts long enough to check. Each variant fills in the feedback, focuses the Send button and presses Enter. The tests use the keyboard, not `.click()`, so the focus checks mean something.
+
+| Variant | Live region | Confirmation announced? | Form after sending | Focus after sending | axe |
+|---|---|---|---|---|---|
+| accessible | `role="status"`, there and empty from page load | Yes: "Thanks! Your feedback was submitted." in the status region | Still there, textarea cleared | Stays on the Send button | 0 violations |
+| broken | None | No | Replaced by the message | Falls back to `<body>` | 0 violations |
+
+**axe can't detect this flaw** (manifest: `nvdaOnly: true`). The broken page is clean to axe, but a screen reader says nothing, and a keyboard user loses their place. Only checking the live region and `document.activeElement` catches it.
 
 ### Files
 
 - `playwright.config.ts`: points Playwright at Team Y's site (`baseURL`) and defines the `chromium` (automatic) and `manual` projects.
 - `tests/menu.spec.ts`: the menu tests.
 - `tests/loading.spec.ts`: the loading indicator tests.
+- `tests/submission-confirmation.spec.ts`: the submission confirmation tests.
 - `tests/helpers/axe.ts`: `runAxe()` (scan against WCAG 2.0/2.1/2.2 A and AA rules, plus report attachment) and `diffViolations()` (violations that are new since the before scan).
 - `tests/helpers/watch-dom.ts`: `watchDom()`, a MutationObserver in the page that reports each change back to the test, and `waitFor()`, which waits until the change we expect has happened. Each change records its text and whether it happened inside a live region.
