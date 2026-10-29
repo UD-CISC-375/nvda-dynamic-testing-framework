@@ -5,7 +5,8 @@
     "test": "playwright test --project=chromium",
     "test:headed": "playwright test --project=chromium --headed",
     "test:manual": "playwright test --project=manual",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:local-build": "node scripts/test-local-build.mjs"
   },
   "dependencies": {
     "@axe-core/playwright": "^4.13.0"
