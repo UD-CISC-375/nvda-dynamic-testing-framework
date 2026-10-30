@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out repository
+      - name: Check out framework repository
         uses: actions/checkout@v4
 
       - name: Set up Node.js
@@ -22,8 +22,23 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      - name: Install dependencies
+      - name: Install framework dependencies
         run: npm ci
+
+      - name: Check out Team Y site
+        uses: actions/checkout@v4
+        with:
+          repository: mlorang/nvda-dynamic-testing-webpage
+          path: nvda-dynamic-testing-webpage
+
+      - name: Install and build Team Y site
+        working-directory: nvda-dynamic-testing-webpage
+        run: |
+          npm ci
+          CI=false npm run build
+          mkdir -p ../site-root
+          rm -rf ../site-root/nvda-dynamic-testing-webpage
+          cp -R build ../site-root/nvda-dynamic-testing-webpage
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
@@ -32,6 +47,8 @@ jobs:
         run: npm run type-check
 
       - name: Run Playwright tests
+        env:
+          BASE_URL: http://127.0.0.1:4173/nvda-dynamic-testing-webpage/
         run: npm test
 
       - name: Upload Playwright report
