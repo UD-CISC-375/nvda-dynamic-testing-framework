@@ -1,0 +1,47 @@
+# Runs the framework's Playwright tests against the webpage, each in its own
+# container. The same file is in both repos; keep the two copies identical.
+#
+#   docker compose up                   both repos from your local copies
+#   FW=<branch> docker compose up       framework from that branch on GitHub
+#   FW= docker compose up               framework from its default branch
+#   WS works the same way for the webpage, and the two can be combined.
+#
+# Local copies must sit side by side, with their default folder names:
+#   nvda-dynamic-testing-framework/  and  nvda-dynamic-testing-webpage/
+# If the build says "additional privileges requested", one of them is missing.
+#
+# Test report: http://localhost:9323    Tested site: http://localhost:8080
+# Stop with Ctrl+C, then: docker compose down
+
+name: nvda-testing
+
+services:
+  webpage:
+    pull_policy: build                     # rebuild on every start, to pick up changes
+    build:
+      # WS unset: local folder. WS empty: GitHub default branch. WS=<branch>: that branch.
+      context: ${WS+https://github.com/UD-CISC-375/nvda-dynamic-testing-webpage.git}${WS:+#}${WS-../nvda-dynamic-testing-webpage}
+    ports:
+      - "${WEBPAGE_PORT:-8080}:80"         # optional: view the tested site
+    healthcheck:                           # "ready" once the site answers
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/nvda-dynamic-testing-webpage/"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  tests:
+    pull_policy: build
+    build:
+      # FW unset: local folder. FW empty: GitHub default branch. FW=<branch>: that branch.
+      context: ${FW+https://github.com/UD-CISC-375/nvda-dynamic-testing-framework.git}${FW:+#}${FW-../nvda-dynamic-testing-framework}
+    environment:
+      # The site to test. Without it, the framework tests the live GitHub Pages site.
+      BASE_URL: ${BASE_URL:-http://webpage/nvda-dynamic-testing-webpage/}
+      SERVE_REPORT: ${SERVE_REPORT:-1}     # 0: exit with the test result instead of serving the report
+      REPORT_PORT: ${REPORT_PORT:-9323}
+    ipc: host                              # recommended by Playwright for Chromium
+    ports:
+      - "${REPORT_PORT:-9323}:9323"        # the report, exported to the browser
+    depends_on:
+      webpage:
+        condition: service_healthy         # start only after the site is ready
