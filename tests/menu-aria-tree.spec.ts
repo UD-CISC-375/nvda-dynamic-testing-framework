@@ -43,10 +43,10 @@ for (const variant of ["accessible", "broken"] as const) {
     // Poll until the accessibility tree changes and settles, then capture it.
     const after = await waitForTreeChange(scope, before);
     // Compute which tree lines were added and removed by opening the menu.
-    const diff = diffTree(before, after);
+    const diff = diffTree(before.content, after.content);
 
-    // Log the full before and after trees for debugging.
-    console.log(`[tree ${variant}] BEFORE\n${before}\n[tree ${variant}] AFTER\n${after}`);
+    // Log the full before and after content trees for debugging.
+    console.log(`[tree ${variant}] BEFORE\n${before.content}\n[tree ${variant}] AFTER\n${after.content}`);
     // Log the computed added/removed lines.
     console.log(`[tree ${variant}] DIFF`, diff);
     // Attach the before/after trees and the diff to the Playwright test report.
