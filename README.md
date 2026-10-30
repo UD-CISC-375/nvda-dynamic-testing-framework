@@ -82,5 +82,6 @@ Sending feedback changes the button to "Sending…", then shows a confirmation. 
 - `tests/menu.spec.ts`: the menu tests.
 - `tests/loading.spec.ts`: the loading indicator tests.
 - `tests/submission-confirmation.spec.ts`: the submission confirmation tests.
-- `tests/helpers/axe.ts`: `runAxe()` (scan against WCAG 2.0/2.1/2.2 A and AA rules, plus report attachment) and `diffViolations()` (violations that are new since the before scan).
-- `tests/helpers/watch-dom.ts`: `watchDom()`, a MutationObserver in the page that reports each change back to the test, and `waitFor()`, which waits until the change we expect has happened. Each change records its text and whether it happened inside a live region.
+- `tests/inline-validation.spec.ts`: checks blur-triggered error feedback for accessible and broken variants, including the live DOM changes and axe scans. The semantic WCAG checks are asserted directly because axe cannot infer whether an error message belongs to a field.
+- `tests/helpers/axe.ts`: `runAxe()` (scan + report attachment) and `diffViolations()` (violations that are new since the before scan).
+- `tests/helpers/watch-dom.ts`: `watchDom()`, a MutationObserver in the page that reports each change back to the test, and `waitFor()`, which waits until the change we expec

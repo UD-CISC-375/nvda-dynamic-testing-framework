@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 0,
+  "run": {
+    "timestamp": "2026-01-01T00:00:00Z",
+    "commit": "0000000000000000000000000000000000000000",
+    "siteUrl": "https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/",
+    "scenarios": [
+      {
+        "scenario": "menu",
+        "variant": "accessible",
+        "verdict": "passed",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded with the menu closed",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": { "new": [], "resolved": [], "totalCount": 0 },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "Clicked the menu button",
+            "domChangeSummary": "The button's aria-expanded changed to true and the menu's hidden attribute was removed.",
+            "treeDiff": {
+              "added": [
+                {
+                  "parentId": "menu-wrapper",
+                  "index": 1,
+                  "subtree": {
+                    "id": "actions-menu",
+                    "properties": { "role": "list" },
+                    "children": [
+                      {
+                        "id": "menu-item-1",
+                        "properties": { "role": "listitem" },
+                        "children": []
+                      }
+                    ]
+                  }
+                }
+              ],
+              "removed": [],
+              "changed": [
+                {
+                  "nodeId": "menu-button",
+                  "properties": [
+                    { "name": "expanded", "before": false, "after": true }
+                  ]
+                }
+              ],
+              "reordered": []
+            },
+            "axe": { "new": [], "resolved": [], "totalCount": 0 },
+            "stable": true
+          }
+        ]
+      },
+      {
+        "scenario": "menu",
+        "variant": "broken",
+        "verdict": "failed",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded with the menu closed",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": { "new": [], "resolved": [], "totalCount": 1 },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "Clicked the menu button",
+            "domChangeSummary": "The menu was inserted without an expanded state on the button.",
+            "treeDiff": {
+              "added": [
+                {
+                  "parentId": "menu-wrapper",
+                  "index": 1,
+                  "subtree": {
+                    "id": "actions-menu",
+                    "properties": { "role": "list" },
+                    "children": [
+                      {
+                        "id": "menu-item-1",
+                        "properties": { "role": "listitem" },
+                        "children": []
+                      }
+                    ]
+                  }
+                }
+              ],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": { "new": [], "resolved": [], "totalCount": 1 },
+            "stable": true
+          }
+        ]
+      }
+    ]
+  }
+}
