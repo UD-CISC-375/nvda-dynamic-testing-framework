@@ -143,6 +143,16 @@ export async function attachTreeDiff(
     body: after.content,
     contentType: "text/plain",
   });
+  // Attach the "before" refs tree (AI mode: ref ids and focus) as plain text.
+  await testInfo.attach(`tree-${label}-before-refs-ai-mode.yaml`, {
+    body: before.refs,
+    contentType: "text/plain",
+  });
+  // Attach the "after" refs tree (AI mode) as plain text.
+  await testInfo.attach(`tree-${label}-after-refs-ai-mode.yaml`, {
+    body: after.refs,
+    contentType: "text/plain",
+  });
   // Attach the diff as pretty-printed JSON.
   await testInfo.attach(`tree-${label}-diff.json`, {
     // Serialize the diff with 2-space indentation and mark it as JSON.
