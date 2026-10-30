@@ -29,6 +29,14 @@ function settleKey(snap: TreeSnapshot): string {
   return `${snap.content}\n${refs}`;
 }
 
+// Return the ref id (e.g. "e28") of the first refs line that matches `pattern`, or undefined.
+export function refOf(refs: string, pattern: RegExp): string | undefined {
+  // Find the first line that matches the pattern.
+  const line = refs.split("\n").find((l) => pattern.test(l));
+  // Pull the id out of "[ref=e28]" on that line, if both exist.
+  return line?.match(/\[ref=(\w+)\]/)?.[1];
+}
+
 // Trim indentation (ignores hierarchy) and drop the trailing ":" that marks children.
 function toLines(snapshot: string): string[] {
   // Split into lines, strip whitespace and trailing ":", then remove empty lines.
