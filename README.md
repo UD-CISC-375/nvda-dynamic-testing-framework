@@ -5,7 +5,7 @@ This repository is going to be used to develop the testing framework for NVDA. T
 ## Menu button: accessibility before and after a DOM change
 
 The first scenario we test is Team Y's menu button:
-https://mlorang.github.io/nvda-dynamic-testing-webpage/#/disclosure/menu?variant=accessible
+[https://mlorang.github.io/nvda-dynamic-testing-webpage/#/disclosure/menu?variant=accessible](https://ud-cisc-375.github.io/nvda-dynamic-testing-webpage/#/disclosure/menu?variant=accessible)
 
 For each variant (`accessible` and `broken`) the test:
 
@@ -47,41 +47,34 @@ The tests assert these outcomes, so `npm test` passes when the broken variant fa
 
 Note that **axe reports nothing new after the broken menu opens**. axe has no way to know the button should announce "expanded". Only the DOM watcher catches that the screen reader is never told the state changed. A scan before and after on its own is not enough. We also need to check that the right kind of change happened.
 
-### Internal results.json schema (version 0)
+## Error summary on submit
 
-The shared TypeScript contract is [`results/schema.ts`](results/schema.ts);
-[`examples/results.json`](examples/results.json) is a hand-written menu
-example for both variants, not a captured test run. Its timestamp, commit,
-tree node IDs and tree contents are illustrative. This format is internal to
-this repository, is expected to change, and is not yet emitted by the tests.
+The second scenario is Team Y's form error summary:
+https://ud-cisc-375.github.io/nvda-dynamic-testing-webpage/#/forms/error-summary?variant=accessible
 
-The top level has `schemaVersion: 0` and `run`: an ISO 8601 `timestamp`,
-git `commit`, base `siteUrl`, and `scenarios`. Each scenario identifies the
-scenario and variant, has a `verdict` (`passed`, `failed`, or `skipped`),
-and contains ordered `states`. A skipped scenario must have a nonempty
-`skippedReason` and may have no states. Verdicts describe the scenario's
-accessibility outcome, not whether a Playwright test asserting an expected
-failure passed.
+For each variant the test focuses Submit and presses Enter with both fields empty, then checks how the errors are reported. The accessible test also follows the "Enter your name" link and submits again with only the name filled in.
 
-State indices start at zero and follow array order. Each state has a
-human-readable `trigger` and `domChangeSummary`, a `treeDiff`, `axe` results,
-and `stable` (whether the state was observed to settle, not whether it
-passed). The first state is the baseline: its tree diff and axe `new` and
-`resolved` lists are empty. Subsequent diffs compare with the previous state.
+### What the results show
 
-`treeDiff` contains `added` and `removed` subtrees with their parent ID and
-zero-based child index, `changed` properties by node ID, and `reordered`
-child ID sequences by parent ID. Node IDs must identify the same tree node
-across states within a scenario; a null parent denotes the root. Subtrees
-include their children recursively. Property changes omit `before` or `after`
-when a property is absent; JSON `null` is a value, not absence. Reorder
-sequences describe the children shared by both states, before and after the
-reorder; additions and removals are recorded separately.
+| Variant | Errors visible? | Focus after submit | Inputs | axe |
+|---|---|---|---|---|
+| accessible | Yes, plus a summary: "There are 2 problems with your submission" with a link per error | Moves to the summary (and again on resubmit, which says "There is 1 problem…") | `aria-invalid="true"`, described by their error message | 0 violations |
+| broken | Yes, next to each field only | Stays on Submit | No `aria-invalid`, no description | 0 violations |
 
-`axe.new` and `axe.resolved` contain rule/target pairs, with `target` preserving
-axe's selector array. `totalCount` counts current rule/target pairs, not
-distinct rules; the baseline count includes existing violations even though
-its diff lists are empty.
+**axe passes both variants** (this scenario is `nvdaOnly`). The broken page's HTML is valid; what's wrong is that nothing tells NVDA the errors appeared. There's no live region, so focus moving to the summary is the only way NVDA finds out. The tests catch this by checking focus and the inputs' ARIA attributes directly.
+
+## Submission confirmation: announcement and focus after sending a form
+
+https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/#/forms/success?variant=accessible
+
+Sending feedback changes the button to "Sending…", then shows a confirmation. Tests use `?delay=3000` so the "Sending…" state lasts long enough to check. Each variant fills in the feedback, focuses the Send button and presses Enter. The tests use the keyboard, not `.click()`, so the focus checks mean something.
+
+| Variant | Live region | Confirmation announced? | Form after sending | Focus after sending | axe |
+|---|---|---|---|---|---|
+| accessible | `role="status"`, there and empty from page load | Yes: "Thanks! Your feedback was submitted." in the status region | Still there, textarea cleared | Stays on the Send button | 0 violations |
+| broken | None | No | Replaced by the message | Falls back to `<body>` | 0 violations |
+
+**axe can't detect this flaw** (manifest: `nvdaOnly: true`). The broken page is clean to axe, but a screen reader says nothing, and a keyboard user loses their place. Only checking the live region and `document.activeElement` catches it.
 
 ### Files
 
