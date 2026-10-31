@@ -1,3 +1,19 @@
+// One node of the parsed accessibility tree.
+export type AriaNode = {
+  // The role ("button", "heading"), or "text" / "/url" / "/placeholder" for those lines.
+  role: string;
+  // The accessible name, if the node has one.
+  name?: string;
+  // The AI-mode ref id, kept as an opaque string ("e12", "f1e1", ...).
+  ref?: string;
+  // Bracket states: [level=2] -> { level: "2" }, [expanded] -> { expanded: true }.
+  states: Record<string, string | true>;
+  // A form field's value, a text node's text, or a /url target.
+  value?: string;
+  // Nodes nested under this one, in order.
+  children: AriaNode[];
+};
+
 // One line of an aria snapshot, split into its parts (nesting is not handled here).
 export type ParsedLine = {
   // Number of leading spaces; deeper lines are children of shallower ones.
@@ -16,7 +32,7 @@ export type ParsedLine = {
   text?: string;
 };
 
-// Undo YAML single quotes: 'It''s' -> It's ('' is an escaped ').
+// Undo YAML single quotes: 'It''s' -> It's
 function unquoteSingle(s: string): string {
   return s.slice(1, -1).replace(/''/g, "'");
 }
@@ -108,4 +124,56 @@ export function parseLine(line: string): ParsedLine | undefined {
   // Remove YAML quotes from the text, if there is any.
   const text = raw ? unquote(raw) : undefined;
   return { indent, role, name, ref, states, active, text };
+}
+
+// Roles whose inline text is the field's current value rather than visible text.
+const FORM_FIELD_ROLES = new Set([
+  "textbox",
+  "searchbox",
+  "combobox",
+  "spinbutton",
+  "slider",
+]);
+
+// Make a tree node from one parsed line (children are attached by buildTree).
+function toNode(line: ParsedLine): AriaNode {
+  // The parts every node shares; children start empty.
+  const node: AriaNode = {
+    role: line.role,
+    name: line.name,
+    ref: line.ref,
+    states: line.states,
+    children: [],
+  };
+  // No text after the colon: nothing more to add.
+  if (line.text === undefined) return node;
+  // "text:", "/url:" and "/placeholder:" lines hold their text directly.
+  if (line.role === "text" || line.role.startsWith("/")) node.value = line.text;
+  // A form field's inline text is its value ("textbox "Email": a@b.c").
+  else if (FORM_FIELD_ROLES.has(line.role)) node.value = line.text;
+  // Any other role's inline text is visible content, so it becomes a child text node.
+  else node.children.push({ role: "text", value: line.text, states: {}, children: [] });
+  return node;
+}
+
+// Build the tree for one snapshot, using indentation to decide who is whose child.
+export function buildTree(snapshot: string): AriaNode[] {
+  // The top-level nodes (a snapshot can have more than one).
+  const roots: AriaNode[] = [];
+  // The chain of open parents from the top level down to the last node added.
+  const stack: { indent: number; node: AriaNode }[] = [];
+  for (const raw of snapshot.split("\n")) {
+    // Parse the line; skip anything that isn't a "- ..." node line.
+    const line = parseLine(raw);
+    if (!line) continue;
+    const node = toNode(line);
+    // Close parents that are at the same depth or deeper; they can't own this line.
+    while (stack.length && stack[stack.length - 1].indent >= line.indent) stack.pop();
+    // The nearest remaining parent owns this node; with none left, it's top-level.
+    const parent = stack[stack.length - 1];
+    (parent ? parent.node.children : roots).push(node);
+    // This node may own the lines that follow, so it becomes the newest open parent.
+    stack.push({ indent: line.indent, node });
+  }
+  return roots;
 }

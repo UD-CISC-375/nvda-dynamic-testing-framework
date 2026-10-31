@@ -1,7 +1,13 @@
 // Import Playwright's test runner and assertion library (no browser is used in this file).
 import { test, expect } from "@playwright/test";
+// Node built-ins for reading fixture files from disk.
+import { readFileSync } from "fs";
+import { join } from "path";
 // Import the snapshot parsing helpers under test.
-import { parseLine } from "./helpers/parse-snapshot";
+import { parseLine, buildTree } from "./helpers/parse-snapshot";
+
+// Read a sample snapshot from tests/fixtures/snapshots (captured from real Playwright output).
+const fixture = (file: string) => readFileSync(join(__dirname, "fixtures", "snapshots", file), "utf8");
 
 // Each line below is copied from real Playwright 1.63 snapshot output.
 test.describe("parseLine", () => {
@@ -63,5 +69,49 @@ test.describe("parseLine", () => {
   // Blank lines aren't nodes.
   test("returns undefined for a line that is not a list item", () => {
     expect(parseLine("")).toBeUndefined();
+  });
+});
+
+test.describe("buildTree", () => {
+  // The default-mode snapshot of the basic sample page.
+  const tree = buildTree(fixture("basic.default.yaml"));
+
+  // Indented lines become children; "- main" is the only top-level node.
+  test("nests lines by indentation", () => {
+    expect(tree).toHaveLength(1);
+    expect(tree[0].role).toBe("main");
+    // Two levels down: main > list > listitem.
+    const list = tree[0].children.find((n) => n.role === "list");
+    expect(list?.children.map((n) => n.role)).toEqual(["listitem", "listitem"]);
+  });
+
+  // "paragraph: Plain bold text" puts its text in a child node, not on the paragraph.
+  test("turns inline text into a child text node", () => {
+    const paragraph = tree[0].children.find((n) => n.role === "paragraph");
+    expect(paragraph?.value).toBeUndefined();
+    expect(paragraph?.children).toEqual([{ role: "text", value: "Plain bold text", states: {}, children: [] }]);
+  });
+
+  // A form field's inline text is its value.
+  test("puts a form field's inline text in value", () => {
+    const textbox = tree[0].children.find((n) => n.role === "textbox");
+    expect(textbox).toMatchObject({ name: "Email", value: "a@b.c", children: [] });
+  });
+
+  // "- text:" lines and "/url:" lines become nodes holding their text in value.
+  test("keeps text: lines and /url: lines as nodes with a value", () => {
+    expect(tree[0].children).toContainEqual({ role: "text", value: "Email", states: {}, children: [] });
+    const link = tree[0].children.find((n) => n.role === "link");
+    expect(link?.children).toEqual([{ role: "/url", value: "/about", states: {}, children: [] }]);
+  });
+
+  // States and decoded names come through on the tree nodes.
+  test("keeps names, valued states and true/false states", () => {
+    expect(tree[0].children[0]).toMatchObject({
+      role: "heading",
+      name: String.raw`Say "hi" \ now`,
+      states: { level: "2" },
+    });
+    expect(tree[0].children.find((n) => n.name === "Open")?.states).toEqual({ expanded: true });
   });
 });
