@@ -1,5 +1,5 @@
-// Import Playwright's test runner and assertion library.
-import { test, expect } from "@playwright/test";
+// Import Playwright's test runner, assertion library, and the Locator type (for the fake scope).
+import { test, expect, Locator } from "@playwright/test";
 // Import the helpers that snapshot a tree and wait for it to change.
 import { snapshotTree, waitForTreeChange } from "./helpers/aria-tree";
 
@@ -42,23 +42,39 @@ test("content that appears 600 ms after a click is in the settled result", async
   expect(after.refs).toMatch(/heading "Results".*\[active\]/);
 });
 
-// A page whose text changes as fast as the browser allows, so the two modes never line up.
-const neverStillPage = `
-  <p id="n">0</p>
-  <script>
-    // Bump the number on every timer tick, forever.
-    let i = 0;
-    setInterval(() => (document.getElementById("n").textContent = String(++i)), 0);
-  </script>
-`;
+// A stand-in for a Locator: only ariaSnapshot exists, and it returns whatever we script.
+// A real page can't be timed to change exactly between two calls; this can.
+function fakeScope(nextContent: () => string) {
+  // Total ariaSnapshot calls, and how many were AI-mode (to number the refs strings).
+  let calls = 0;
+  let refsCalls = 0;
+  const scope = {
+    async ariaSnapshot(options?: { mode?: string }) {
+      calls++;
+      // AI mode returns "refs 1", "refs 2", ...; default mode returns the scripted content.
+      return options?.mode === "ai" ? `refs ${++refsCalls}` : nextContent();
+    },
+  };
+  // snapshotTree only calls ariaSnapshot, so the cast is safe here.
+  return { scope: scope as unknown as Locator, calls: () => calls };
+}
 
-// The retry in snapshotTree is capped, so a page that never stops changing can't hang it.
-test("snapshotTree still returns on a page that never stops changing", async ({ page }) => {
-  // Load the constantly changing page.
-  await page.setContent(neverStillPage);
-  // Snapshot it; this must finish rather than retry forever.
-  const snap = await snapshotTree(page.locator("body"));
-  // Both modes came back with the paragraph in them.
-  expect(snap.content).toContain("paragraph");
-  expect(snap.refs).toContain("paragraph");
+// The content changes once, between the first two reads: the retry gets a matching pair.
+test("snapshotTree retries when content changes around the refs snapshot", async () => {
+  // First content read is "A", every read after that is "B".
+  let reads = 0;
+  const { scope } = fakeScope(() => (reads++ === 0 ? "A" : "B"));
+  // Attempt 1: A, refs 1, B (changed). Attempt 2: refs 2, B (same): consistent.
+  expect(await snapshotTree(scope)).toEqual({ content: "B", refs: "refs 2", consistent: true });
+});
+
+// The content changes on every read: snapshotTree gives up after 3 tries and says so.
+test("snapshotTree reports consistent: false when the page never stops changing", async () => {
+  // Every content read returns a new value.
+  let reads = 0;
+  const { scope, calls } = fakeScope(() => `content ${reads++}`);
+  const snap = await snapshotTree(scope);
+  expect(snap.consistent).toBe(false);
+  // 1 first content read + 3 tries x (refs + content) = 7 calls, so it stopped at the cap.
+  expect(calls()).toBe(7);
 });

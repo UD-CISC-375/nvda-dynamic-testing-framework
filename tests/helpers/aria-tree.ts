@@ -7,6 +7,9 @@ export type TreeSnapshot = {
   content: string;
   // AI-mode snapshot: stable [ref=eN] ids and the [active] focus marker.
   refs: string;
+  // False if the page kept changing and snapshotTree ran out of retries, so content
+  // and refs may describe slightly different moments.
+  consistent: boolean;
 };
 
 // How many times snapshotTree retries before giving up on a page that keeps changing.
@@ -24,9 +27,12 @@ export async function snapshotTree(scope: Locator): Promise<TreeSnapshot> {
     const refs = await scope.ariaSnapshot({ mode: "ai" });
     // Default mode again, strictly after refs finished.
     const contentAfter = await scope.ariaSnapshot();
-    // No change around the refs snapshot (or out of tries): the pair goes together.
-    if (contentAfter === content || attempt >= MAX_SNAPSHOT_TRIES)
-      return { content: contentAfter, refs };
+    // No change around the refs snapshot: the pair goes together.
+    if (contentAfter === content)
+      return { content: contentAfter, refs, consistent: true };
+    // Out of tries: return the latest pair, but say it may not match.
+    if (attempt >= MAX_SNAPSHOT_TRIES)
+      return { content: contentAfter, refs, consistent: false };
     // The page changed mid-snapshot: start over from the newest content.
     content = contentAfter;
   }
