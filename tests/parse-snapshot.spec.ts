@@ -222,20 +222,20 @@ test.describe("parseSnapshot: focus, hidden content and reloads", () => {
     expect(hidden.tree[0].children.find((n) => n.role === "link")).toMatchObject({ name: "Help", ref: "e10" });
   });
 
-  // Focus is returned on its own: the ref of the [active] line, plus what kind of thing it is.
-  test("returns focus separately, as a node in the tree", () => {
-    expect(hidden.focus).toEqual({ ref: "e6", kind: "node" });
+  // The focused ref is returned on its own: the ref of the [active] line.
+  test("returns focusedRef separately", () => {
+    expect(hidden.focusedRef).toBe("e6");
     // It is the ref of the Save button in the merged tree, not a shifted neighbor.
-    expect(hidden.tree[0].children.find((n) => n.ref === hidden.focus?.ref)?.name).toBe("Save");
+    expect(hidden.tree[0].children.find((n) => n.ref === hidden.focusedRef)?.name).toBe("Save");
   });
 
-  // With no [active] marker, there is no focus.
-  test("focus is undefined when nothing is marked active", () => {
-    const { focus } = parseSnapshot({
+  // With no [active] marker, there is no focused ref.
+  test("focusedRef is undefined when nothing is marked active", () => {
+    const { focusedRef } = parseSnapshot({
       content: fixture("basic.default.yaml"),
       refs: fixture("basic.ai.yaml"),
     });
-    expect(focus).toBeUndefined();
+    expect(focusedRef).toBeUndefined();
   });
 
   // After a reload, refs look like f1e2; they're copied as-is, never parsed.
@@ -248,17 +248,17 @@ test.describe("parseSnapshot: focus, hidden content and reloads", () => {
   });
 
   // <body> has focus here: the [active] line is the top-level generic, which isn't in the tree.
-  test("focus kind is body when <body> has focus", () => {
-    expect(reload.focus).toEqual({ ref: "f1e1", kind: "body" });
+  test("focusedRef can be a ref that isn't in the tree (<body> has focus)", () => {
+    expect(reload.focusedRef).toBe("f1e1");
     expect(JSON.stringify(reload.tree)).not.toContain("f1e1");
   });
 });
 
-// The remaining focus kinds, using snapshot lines copied from real Playwright output.
-test.describe("parseSnapshot: focus kinds", () => {
+// Unusual focusedRef cases, using snapshot lines copied from real Playwright output.
+test.describe("parseSnapshot: focusedRef edge cases", () => {
   // Focus inside an iframe marks the iframe line first, then the element inside it.
   test("iframe: focus is inside an iframe", () => {
-    const { focus } = parseSnapshot({
+    const { focusedRef } = parseSnapshot({
       content: `- button "Outer"\n- iframe`,
       refs: [
         `- generic [ref=e9]:`,
@@ -267,44 +267,13 @@ test.describe("parseSnapshot: focus kinds", () => {
         `    - button "Inner" [active] [ref=f1e2]`,
       ].join("\n"),
     });
-    expect(focus).toEqual({ ref: "e11", kind: "iframe" });
-  });
-
-  // A focused <button aria-hidden="true">: focus is somewhere a screen reader can't follow.
-  test("hidden: focus is on an [aria-hidden] element", () => {
-    const { tree, focus } = parseSnapshot({
-      content: `- button "Real"`,
-      refs: [
-        `- generic [ref=e12]:`,
-        `  - button [active] [aria-hidden] [ref=e13]: Ghost`,
-        `  - button "Real" [ref=e14]`,
-      ].join("\n"),
-    });
-    expect(focus).toEqual({ ref: "e13", kind: "hidden" });
-    // The real button still gets its own ref.
-    expect(tree[0].ref).toBe("e14");
-  });
-
-  // A focused link inside <div aria-hidden="true">: no marker, and not in the merged tree.
-  test("unmatched: focus is on something not in the tree, with no [aria-hidden] marker", () => {
-    const { tree, focus } = parseSnapshot({
-      content: `- link "Real":\n  - /url: /y`,
-      refs: [
-        `- generic [ref=e5]:`,
-        `  - link [active] [ref=e7] [cursor=pointer]:`,
-        `    - /url: /x`,
-        `    - text: Ghost`,
-        `  - link "Real" [ref=e8] [cursor=pointer]:`,
-        `    - /url: /y`,
-      ].join("\n"),
-    });
-    expect(focus).toEqual({ ref: "e7", kind: "unmatched" });
-    expect(tree[0].ref).toBe("e8");
+    expect(focusedRef).toBe("e11");
   });
 
   // Known gap: AI mode leaves a focused plain <div tabindex="-1"> out and marks nothing.
+  // This is why focus comes from watchDom, not [active].
   test("a focused plain div is not reported, because AI mode marks nothing", () => {
-    const { focus } = parseSnapshot({
+    const { focusedRef } = parseSnapshot({
       content: `- heading "Shop" [level=1]\n- paragraph: Results loaded`,
       refs: [
         `- generic [ref=e1]:`,
@@ -312,6 +281,6 @@ test.describe("parseSnapshot: focus kinds", () => {
         `  - paragraph [ref=e4]: Results loaded`,
       ].join("\n"),
     });
-    expect(focus).toBeUndefined();
+    expect(focusedRef).toBeUndefined();
   });
 });
