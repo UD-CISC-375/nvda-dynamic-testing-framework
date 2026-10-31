@@ -283,7 +283,8 @@ function findFocus(refs: string, tree: AriaNode[]): Focus | undefined {
 }
 
 // Build one tree: content from default mode, refs from AI mode, plus where focus is.
-export function parseSnapshot(snap: TreeSnapshot): {
+// Only content and refs are needed, so hand-written samples don't need `consistent`.
+export function parseSnapshot(snap: Pick<TreeSnapshot, "content" | "refs">): {
   tree: AriaNode[];
   focus?: Focus;
 } {
