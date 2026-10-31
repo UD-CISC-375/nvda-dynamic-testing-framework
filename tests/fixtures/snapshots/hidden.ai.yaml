@@ -1,0 +1,8 @@
+- main [ref=e2]:
+  - heading "Cart" [level=2] [ref=e3]
+  - paragraph [ref=e4]: "Total: $20 HIDDEN-ICON"
+  - button "Checkout" [active] [ref=e5]
+  - button [ref=e7]: HIDDEN-BUTTON
+  - generic [ref=e8]:
+    - text: Coupon
+    - textbox "Coupon" [ref=e9]

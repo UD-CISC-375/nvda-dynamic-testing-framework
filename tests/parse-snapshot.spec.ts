@@ -172,3 +172,56 @@ test.describe("parseSnapshot", () => {
     ]);
   });
 });
+
+test.describe("parseSnapshot: focus, hidden content and reloads", () => {
+  // A page with an aria-hidden icon inside a paragraph, an aria-hidden button, and focus on "Checkout".
+  const hidden = parseSnapshot({
+    content: fixture("hidden.default.yaml"),
+    refs: fixture("hidden.ai.yaml"),
+  });
+  // The same kind of page captured after page.reload(), where refs look like f1e2.
+  const reload = parseSnapshot({
+    content: fixture("reload.default.yaml"),
+    refs: fixture("reload.ai.yaml"),
+  });
+
+  // AI mode leaks aria-hidden text and nodes; the merged tree must not.
+  test("aria-hidden text never appears in the merged tree", () => {
+    const json = JSON.stringify(hidden.tree);
+    expect(json).not.toContain("HIDDEN-ICON");
+    expect(json).not.toContain("HIDDEN-BUTTON");
+    // The paragraph's text comes from default mode, without the hidden icon.
+    expect(hidden.tree[0].children[1].children[0].value).toBe("Total: $20");
+  });
+
+  // Focus is returned on its own, as the ref of the [active] line.
+  test("returns focusedRef separately", () => {
+    expect(hidden.focusedRef).toBe("e5");
+    // It is the ref of the "Checkout" button in the merged tree.
+    expect(hidden.tree[0].children.find((n) => n.ref === hidden.focusedRef)?.name).toBe("Checkout");
+  });
+
+  // With no [active] marker, there is no focused ref.
+  test("focusedRef is undefined when nothing is marked active", () => {
+    const { focusedRef } = parseSnapshot({
+      content: fixture("basic.default.yaml"),
+      refs: fixture("basic.ai.yaml"),
+    });
+    expect(focusedRef).toBeUndefined();
+  });
+
+  // After a reload, refs look like f1e2; they're copied as-is, never parsed.
+  test("treats refs as opaque strings after a reload", () => {
+    expect(reload.tree.map((n) => [n.role, n.ref])).toEqual([
+      ["heading", "f1e2"],
+      ["button", "f1e3"],
+      ["link", "f1e4"],
+    ]);
+  });
+
+  // <body> has focus here, so focusedRef is the ref of a skipped generic, not a tree node.
+  test("focusedRef can point at a skipped generic when <body> has focus", () => {
+    expect(reload.focusedRef).toBe("f1e1");
+    expect(JSON.stringify(reload.tree)).not.toContain("f1e1");
+  });
+});
