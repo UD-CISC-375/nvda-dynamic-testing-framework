@@ -55,7 +55,8 @@ function closingQuote(s: string, start: number): number {
     if (s[i] === "\\") i++;
     else if (s[i] === '"') return i;
   }
-  // No closing quote: treat the rest of the line as the string.
+  // No closing quote (Playwright always closes them): return the last index. A name
+  // like this then makes the JSON.parse in parseLine throw instead of being misread.
   return s.length - 1;
 }
 
