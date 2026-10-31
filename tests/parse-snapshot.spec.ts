@@ -98,11 +98,21 @@ test.describe("buildTree", () => {
     expect(textbox).toMatchObject({ name: "Email", value: "a@b.c", children: [] });
   });
 
-  // "- text:" lines and "/url:" lines become nodes holding their text in value.
-  test("keeps text: lines and /url: lines as nodes with a value", () => {
+  // "- text:" lines become nodes holding their text in value.
+  test("keeps text: lines as nodes with a value", () => {
     expect(tree[0].children).toContainEqual({ role: "text", value: "Email", states: {}, children: [] });
+  });
+
+  // "/url:" describes the link, so it becomes a state on the link, not a child node.
+  test("turns /url: lines into a url state on the parent", () => {
     const link = tree[0].children.find((n) => n.role === "link");
-    expect(link?.children).toEqual([{ role: "/url", value: "/about", states: {}, children: [] }]);
+    expect(link).toMatchObject({ name: "About us", states: { url: "/about" }, children: [] });
+  });
+
+  // "/placeholder:" works the same way (lines copied from real Playwright output).
+  test("turns /placeholder: lines into a placeholder state on the parent", () => {
+    const [textbox] = buildTree(`- textbox "Search":\n  - /placeholder: Type here`);
+    expect(textbox).toEqual({ role: "textbox", name: "Search", states: { placeholder: "Type here" }, children: [] });
   });
 
   // States and decoded names come through on the tree nodes.
