@@ -1,3 +1,6 @@
+// Import only the TreeSnapshot type (the default + AI-mode snapshot pair).
+import type { TreeSnapshot } from "./aria-tree";
+
 // One node of the parsed accessibility tree.
 export type AriaNode = {
   // The role ("button", "heading"), or "text" / "/url" / "/placeholder" for those lines.
@@ -176,4 +179,59 @@ export function buildTree(snapshot: string): AriaNode[] {
     stack.push({ indent: line.indent, node });
   }
   return roots;
+}
+
+// An AI-mode node in a flattened sibling list, plus where the next sibling starts.
+type Candidate = { node: AriaNode; next: number };
+
+// List AI-mode siblings in order, with each generic followed by its own children.
+// Default mode leaves unnamed generic wrappers out, so their children count as siblings.
+function flatten(nodes: AriaNode[], out: Candidate[] = []): Candidate[] {
+  for (const node of nodes) {
+    const entry = { node, next: 0 };
+    out.push(entry);
+    // A generic's children are listed right after it, as if they were its siblings.
+    if (node.role === "generic") flatten(node.children, out);
+    // The next sibling starts after this node and anything listed under it.
+    entry.next = out.length;
+  }
+  return out;
+}
+
+// Copy refs from AI-mode nodes onto matching default-mode nodes, by order and role only.
+// Names are never compared. Limitation: if an AI-only node (e.g. an aria-hidden button)
+// comes before a real node of the same role, the real node gets the hidden node's ref.
+function mergeRefs(defaults: AriaNode[], ai: AriaNode[]): void {
+  // AI siblings in order, with generic wrappers opened up.
+  const candidates = flatten(ai);
+  // Position of the first AI candidate not yet used.
+  let i = 0;
+  for (const node of defaults) {
+    // Text, /url and /placeholder nodes never have refs, so there's nothing to match.
+    if (node.role === "text" || node.role.startsWith("/")) continue;
+    // Skip AI-only nodes until one has the same role and a ref.
+    let j = i;
+    while (j < candidates.length) {
+      const c = candidates[j].node;
+      if (c.role === node.role && c.ref !== undefined) break;
+      j++;
+    }
+    // No match (e.g. <option> lines have no ref): leave this node without one.
+    if (j === candidates.length) continue;
+    // Take the ref, then match the two nodes' children the same way.
+    const match = candidates[j];
+    node.ref = match.node.ref;
+    mergeRefs(node.children, match.node.children);
+    // Later siblings can only match after this one (and outside it, if it was a generic).
+    i = match.next;
+  }
+}
+
+// Build one tree: content from default mode, refs from AI mode.
+export function parseSnapshot(snap: TreeSnapshot): { tree: AriaNode[] } {
+  // Content: what a screen reader gets, so aria-hidden text never gets in.
+  const tree = buildTree(snap.content);
+  // Refs come from AI mode; its tree is only used for matching, never for content.
+  mergeRefs(tree, buildTree(snap.refs));
+  return { tree };
 }
