@@ -198,11 +198,12 @@ function flatten(nodes: AriaNode[], out: Candidate[] = []): Candidate[] {
   return out;
 }
 
-// Copy refs from AI-mode nodes onto matching default-mode nodes, by order and role only.
-// Names are never compared. Nodes marked [aria-hidden] are skipped, but nodes inside an
-// aria-hidden wrapper carry no marker. Limitation: if one of those comes before real
-// nodes of the same role, the first real node takes its ref and every later sibling
-// of that role shifts onto its neighbor's ref.
+// Copy refs from AI-mode nodes onto matching default-mode nodes, by order and role.
+// Nodes marked [aria-hidden] are skipped. Nodes inside an aria-hidden wrapper carry no
+// marker, but they have no name, so names break ties: among same-role candidates, one
+// with the same name wins. Names never have to match.
+// Limitation: an unnamed real node can still take the ref of an unnamed hidden node
+// before it, and then every later unnamed sibling of that role shifts by one.
 function mergeRefs(defaults: AriaNode[], ai: AriaNode[]): void {
   // AI siblings in order, with generic wrappers opened up.
   const candidates = flatten(ai);
@@ -211,16 +212,25 @@ function mergeRefs(defaults: AriaNode[], ai: AriaNode[]): void {
   for (const node of defaults) {
     // Text, /url and /placeholder nodes never have refs, so there's nothing to match.
     if (node.role === "text" || node.role.startsWith("/")) continue;
-    // Skip AI-only nodes until one has the same role, a ref, and isn't [aria-hidden].
-    let j = i;
-    while (j < candidates.length) {
+    // The first possible candidate, and the first one whose name also matches.
+    let first = -1;
+    let named = -1;
+    for (let j = i; j < candidates.length; j++) {
       const c = candidates[j].node;
-      // A screen reader never sees an [aria-hidden] node, so it can't be this one.
-      if (c.role === node.role && c.ref !== undefined && !c.states["aria-hidden"]) break;
-      j++;
+      // Possible means: same role, has a ref, and isn't [aria-hidden] (a screen reader
+      // never sees those, so it can't be this node).
+      if (c.role !== node.role || c.ref === undefined || c.states["aria-hidden"]) continue;
+      if (first === -1) first = j;
+      // Same name too: the best match, so stop looking.
+      if (c.name === node.name) {
+        named = j;
+        break;
+      }
     }
+    // Prefer the name match; otherwise fall back to the first possible candidate.
+    const j = named !== -1 ? named : first;
     // No match (e.g. <option> lines have no ref): leave this node without one.
-    if (j === candidates.length) continue;
+    if (j === -1) continue;
     // Take the ref, then match the two nodes' children the same way.
     const match = candidates[j];
     node.ref = match.node.ref;
