@@ -248,51 +248,19 @@ function mergeRefs(defaults: AriaNode[], ai: AriaNode[]): void {
   }
 }
 
-// Where focus is, and what kind of thing has it.
-export type Focus = {
-  // The ref on the AI-mode line marked [active].
-  ref: string;
-  // node:      a node in the merged tree (its ref is in `tree`).
-  // body:      the snapshot's root element, e.g. <body> when the scope is the page.
-  // iframe:    something inside an iframe; `ref` is the iframe node's ref.
-  // hidden:    an element marked [aria-hidden], which a screen reader can't reach.
-  // unmatched: something not in the merged tree for another reason (e.g. inside an
-  //            aria-hidden wrapper, which carries no marker).
-  kind: "node" | "body" | "iframe" | "hidden" | "unmatched";
-};
-
-// True if `ref` is on any node in `nodes` or below them.
-function hasRef(nodes: AriaNode[], ref: string): boolean {
-  return nodes.some((n) => n.ref === ref || hasRef(n.children, ref));
-}
-
-// Find the [active] AI-mode line and work out what kind of thing it is.
-// Undefined if nothing is marked, which includes a focused plain <div tabindex=-1>:
-// AI mode leaves such divs out entirely.
-function findFocus(refs: string, tree: AriaNode[]): Focus | undefined {
-  // The first [active] line. Focus inside an iframe marks the iframe line first.
-  const line = refs.split("\n").map(parseLine).find((l) => l?.active);
-  if (!line?.ref) return undefined;
-  const ref = line.ref;
-  // Checked in this order: an iframe's own ref is also in the tree, so check it first.
-  if (line.role === "iframe") return { ref, kind: "iframe" };
-  if (line.states["aria-hidden"]) return { ref, kind: "hidden" };
-  if (hasRef(tree, ref)) return { ref, kind: "node" };
-  // A top-level generic is the scope's root element, which default mode leaves out.
-  if (line.role === "generic" && line.indent === 0) return { ref, kind: "body" };
-  return { ref, kind: "unmatched" };
-}
-
-// Build one tree: content from default mode, refs from AI mode, plus where focus is.
+// Build one tree: content from default mode, refs from AI mode, plus the focused ref.
 // Only content and refs are needed, so hand-written samples don't need `consistent`.
 export function parseSnapshot(snap: Pick<TreeSnapshot, "content" | "refs">): {
   tree: AriaNode[];
-  focus?: Focus;
+  focusedRef?: string;
 } {
   // Content: what a screen reader gets, so aria-hidden text never gets in.
   const tree = buildTree(snap.content);
   // Refs come from AI mode; its tree is only used for matching, never for content.
   mergeRefs(tree, buildTree(snap.refs));
-  // Focus is worked out from the raw AI lines, after refs are merged into `tree`.
-  return { tree, focus: findFocus(snap.refs, tree) };
+  // The ref on the first AI line marked [active], kept only for reports; focus is
+  // judged from watchDom (#127, #129). It may not be in `tree` (<body> has focus), or
+  // may be the iframe's ref when focus is inside an iframe (its line is marked first).
+  const focusedRef = snap.refs.split("\n").map(parseLine).find((l) => l?.active)?.ref;
+  return { tree, focusedRef };
 }
