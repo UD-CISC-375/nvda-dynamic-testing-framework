@@ -1,0 +1,6 @@
+- main:
+  - heading "Cart" [level=2]
+  - paragraph: "Total: $20"
+  - button "Checkout"
+  - text: Coupon
+  - textbox "Coupon"

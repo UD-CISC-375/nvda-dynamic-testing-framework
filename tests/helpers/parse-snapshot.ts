@@ -227,11 +227,20 @@ function mergeRefs(defaults: AriaNode[], ai: AriaNode[]): void {
   }
 }
 
-// Build one tree: content from default mode, refs from AI mode.
-export function parseSnapshot(snap: TreeSnapshot): { tree: AriaNode[] } {
+// Build one tree: content from default mode, refs from AI mode, plus the focused ref.
+export function parseSnapshot(snap: TreeSnapshot): {
+  tree: AriaNode[];
+  focusedRef?: string;
+} {
   // Content: what a screen reader gets, so aria-hidden text never gets in.
   const tree = buildTree(snap.content);
   // Refs come from AI mode; its tree is only used for matching, never for content.
   mergeRefs(tree, buildTree(snap.refs));
-  return { tree };
+  // The ref on the AI line marked [active]. If <body> has focus, this is the ref of
+  // a skipped generic, so it may not appear anywhere in `tree`.
+  const focusedRef = snap.refs
+    .split("\n")
+    .map(parseLine)
+    .find((line) => line?.active)?.ref;
+  return { tree, focusedRef };
 }
