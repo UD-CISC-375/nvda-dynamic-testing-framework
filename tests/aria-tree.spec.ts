@@ -41,3 +41,24 @@ test("content that appears 600 ms after a click is in the settled result", async
   // Focus is still reported, through refs, on the heading.
   expect(after.refs).toMatch(/heading "Results".*\[active\]/);
 });
+
+// A page whose text changes as fast as the browser allows, so the two modes never line up.
+const neverStillPage = `
+  <p id="n">0</p>
+  <script>
+    // Bump the number on every timer tick, forever.
+    let i = 0;
+    setInterval(() => (document.getElementById("n").textContent = String(++i)), 0);
+  </script>
+`;
+
+// The retry in snapshotTree is capped, so a page that never stops changing can't hang it.
+test("snapshotTree still returns on a page that never stops changing", async ({ page }) => {
+  // Load the constantly changing page.
+  await page.setContent(neverStillPage);
+  // Snapshot it; this must finish rather than retry forever.
+  const snap = await snapshotTree(page.locator("body"));
+  // Both modes came back with the paragraph in them.
+  expect(snap.content).toContain("paragraph");
+  expect(snap.refs).toContain("paragraph");
+});
