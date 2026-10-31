@@ -4,7 +4,7 @@ import { test, expect } from "@playwright/test";
 import { readFileSync } from "fs";
 import { join } from "path";
 // Import the snapshot parsing helpers under test.
-import { parseLine, buildTree } from "./helpers/parse-snapshot";
+import { parseLine, buildTree, parseSnapshot } from "./helpers/parse-snapshot";
 
 // Read a sample snapshot from tests/fixtures/snapshots (captured from real Playwright output).
 const fixture = (file: string) => readFileSync(join(__dirname, "fixtures", "snapshots", file), "utf8");
@@ -113,5 +113,62 @@ test.describe("buildTree", () => {
       states: { level: "2" },
     });
     expect(tree[0].children.find((n) => n.name === "Open")?.states).toEqual({ expanded: true });
+  });
+});
+
+test.describe("parseSnapshot", () => {
+  // Default and AI-mode snapshots of the same basic sample page, taken together.
+  const { tree } = parseSnapshot({
+    content: fixture("basic.default.yaml"),
+    refs: fixture("basic.ai.yaml"),
+  });
+  // Shorthand: the children of "- main".
+  const main = tree[0].children;
+
+  // Plain siblings get the ref of the AI node in the same position with the same role.
+  test("copies refs onto matching nodes", () => {
+    expect(tree[0].ref).toBe("e2");
+    expect(main.map((n) => n.ref)).toEqual([
+      "e3", // heading
+      "e4", // paragraph
+      "e5", // link
+      "e6", // button "Actions"
+      "e7", // button "Open"
+      undefined, // text: Email
+      "e9", // textbox "Email"
+      "e11", // checkbox "Agree"
+      undefined, // text: Agree
+      "e12", // list
+      "e16", // iframe
+    ]);
+  });
+
+  // Refs are matched inside nested nodes too: main > list > listitem > link.
+  test("copies refs at every depth", () => {
+    const list = main.find((n) => n.role === "list");
+    expect(list?.children.map((n) => n.ref)).toEqual(["e13", "e14"]);
+    expect(list?.children[1].children.find((n) => n.role === "link")?.ref).toBe("e15");
+  });
+
+  // AI mode wraps "text: Email" + textbox in a generic; default mode doesn't. No generic is kept.
+  test("skips AI-mode-only generic lines", () => {
+    expect(JSON.stringify(tree)).not.toContain("generic");
+  });
+
+  // The iframe gets its ref, but its AI-only children (ref f1e2) are not content.
+  test("gives the iframe its ref without adding AI-only children", () => {
+    expect(main.find((n) => n.role === "iframe")).toMatchObject({ ref: "e16", children: [] });
+  });
+
+  // AI-mode names can differ (they can include aria-hidden text), so they're never compared.
+  test("matches by order and role, never by name", () => {
+    const { tree } = parseSnapshot({
+      content: `- button "Save"\n- button "Cancel"`,
+      refs: `- button "Save extra" [ref=e1]\n- button "Different" [ref=e2]`,
+    });
+    expect(tree.map((n) => [n.name, n.ref])).toEqual([
+      ["Save", "e1"],
+      ["Cancel", "e2"],
+    ]);
   });
 });
