@@ -3,15 +3,16 @@ import type { TreeSnapshot } from "./aria-tree";
 
 // One node of the parsed accessibility tree.
 export type AriaNode = {
-  // The role ("button", "heading"), or "text" / "/url" / "/placeholder" for those lines.
+  // The role ("button", "heading"), or "text" for text lines.
   role: string;
   // The accessible name, if the node has one.
   name?: string;
   // The AI-mode ref id, kept as an opaque string ("e12", "f1e1", ...).
   ref?: string;
   // Bracket states: [level=2] -> { level: "2" }, [expanded] -> { expanded: true }.
+  // Also "/url:" and "/placeholder:" lines: { url: "/about" }, { placeholder: "Type here" }.
   states: Record<string, string | true>;
-  // A form field's value, a text node's text, or a /url target.
+  // A form field's value, or a text node's text.
   value?: string;
   // Nodes nested under this one, in order.
   children: AriaNode[];
@@ -150,8 +151,8 @@ function toNode(line: ParsedLine): AriaNode {
   };
   // No text after the colon: nothing more to add.
   if (line.text === undefined) return node;
-  // "text:", "/url:" and "/placeholder:" lines hold their text directly.
-  if (line.role === "text" || line.role.startsWith("/")) node.value = line.text;
+  // "text:" lines hold their text directly.
+  if (line.role === "text") node.value = line.text;
   // A form field's inline text is its value ("textbox "Email": a@b.c").
   else if (FORM_FIELD_ROLES.has(line.role)) node.value = line.text;
   // Any other role's inline text is visible content, so it becomes a child text node.
@@ -169,11 +170,17 @@ export function buildTree(snapshot: string): AriaNode[] {
     // Parse the line; skip anything that isn't a "- ..." node line.
     const line = parseLine(raw);
     if (!line) continue;
-    const node = toNode(line);
     // Close parents that are at the same depth or deeper; they can't own this line.
     while (stack.length && stack[stack.length - 1].indent >= line.indent) stack.pop();
-    // The nearest remaining parent owns this node; with none left, it's top-level.
+    // The nearest remaining parent owns this line; with none left, it's top-level.
     const parent = stack[stack.length - 1];
+    // "/url:" and "/placeholder:" describe their parent, so they become its states,
+    // not child nodes. A changed link target then shows up as a state change.
+    if (line.role.startsWith("/")) {
+      if (parent) parent.node.states[line.role.slice(1)] = line.text ?? "";
+      continue;
+    }
+    const node = toNode(line);
     (parent ? parent.node.children : roots).push(node);
     // This node may own the lines that follow, so it becomes the newest open parent.
     stack.push({ indent: line.indent, node });
@@ -210,8 +217,8 @@ function mergeRefs(defaults: AriaNode[], ai: AriaNode[]): void {
   // Position of the first AI candidate not yet used.
   let i = 0;
   for (const node of defaults) {
-    // Text, /url and /placeholder nodes never have refs, so there's nothing to match.
-    if (node.role === "text" || node.role.startsWith("/")) continue;
+    // Text nodes never have refs, so there's nothing to match.
+    if (node.role === "text") continue;
     // The first possible candidate, and the first one whose name also matches.
     let first = -1;
     let named = -1;
