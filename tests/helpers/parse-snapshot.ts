@@ -199,8 +199,10 @@ function flatten(nodes: AriaNode[], out: Candidate[] = []): Candidate[] {
 }
 
 // Copy refs from AI-mode nodes onto matching default-mode nodes, by order and role only.
-// Names are never compared. Limitation: if an AI-only node (e.g. an aria-hidden button)
-// comes before a real node of the same role, the real node gets the hidden node's ref.
+// Names are never compared. Nodes marked [aria-hidden] are skipped, but nodes inside an
+// aria-hidden wrapper carry no marker. Limitation: if one of those comes before real
+// nodes of the same role, the first real node takes its ref and every later sibling
+// of that role shifts onto its neighbor's ref.
 function mergeRefs(defaults: AriaNode[], ai: AriaNode[]): void {
   // AI siblings in order, with generic wrappers opened up.
   const candidates = flatten(ai);
@@ -209,11 +211,12 @@ function mergeRefs(defaults: AriaNode[], ai: AriaNode[]): void {
   for (const node of defaults) {
     // Text, /url and /placeholder nodes never have refs, so there's nothing to match.
     if (node.role === "text" || node.role.startsWith("/")) continue;
-    // Skip AI-only nodes until one has the same role and a ref.
+    // Skip AI-only nodes until one has the same role, a ref, and isn't [aria-hidden].
     let j = i;
     while (j < candidates.length) {
       const c = candidates[j].node;
-      if (c.role === node.role && c.ref !== undefined) break;
+      // A screen reader never sees an [aria-hidden] node, so it can't be this one.
+      if (c.role === node.role && c.ref !== undefined && !c.states["aria-hidden"]) break;
       j++;
     }
     // No match (e.g. <option> lines have no ref): leave this node without one.
