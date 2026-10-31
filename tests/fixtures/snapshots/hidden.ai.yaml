@@ -1,8 +1,11 @@
 - main [ref=e2]:
   - heading "Cart" [level=2] [ref=e3]
   - paragraph [ref=e4]: "Total: $20 HIDDEN-ICON"
-  - button "Checkout" [active] [ref=e5]
-  - button [ref=e7]: HIDDEN-BUTTON
-  - generic [ref=e8]:
-    - text: Coupon
-    - textbox "Coupon" [ref=e9]
+  - button [aria-hidden] [ref=e5]: HIDDEN-X
+  - button "Save" [active] [ref=e6]
+  - button "Cancel" [ref=e7]
+  - link [ref=e9] [cursor=pointer]:
+    - /url: /hidden
+    - text: HIDDEN-LINK
+  - link "Help" [ref=e10] [cursor=pointer]:
+    - /url: /help

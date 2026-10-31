@@ -174,7 +174,8 @@ test.describe("parseSnapshot", () => {
 });
 
 test.describe("parseSnapshot: focus, hidden content and reloads", () => {
-  // A page with an aria-hidden icon inside a paragraph, an aria-hidden button, and focus on "Checkout".
+  // A page with an aria-hidden icon in a paragraph, an aria-hidden button before Save and Cancel,
+  // a link inside an aria-hidden div before a real link, and focus on Save.
   const hidden = parseSnapshot({
     content: fixture("hidden.default.yaml"),
     refs: fixture("hidden.ai.yaml"),
@@ -189,16 +190,27 @@ test.describe("parseSnapshot: focus, hidden content and reloads", () => {
   test("aria-hidden text never appears in the merged tree", () => {
     const json = JSON.stringify(hidden.tree);
     expect(json).not.toContain("HIDDEN-ICON");
-    expect(json).not.toContain("HIDDEN-BUTTON");
+    expect(json).not.toContain("HIDDEN-X");
+    expect(json).not.toContain("HIDDEN-LINK");
     // The paragraph's text comes from default mode, without the hidden icon.
     expect(hidden.tree[0].children[1].children[0].value).toBe("Total: $20");
   });
 
+  // The [aria-hidden] button (e5) comes first in AI mode; it must not take Save's ref
+  // and push Cancel onto Save's ref.
+  test("an [aria-hidden] node does not shift refs of later siblings", () => {
+    const buttons = hidden.tree[0].children.filter((n) => n.role === "button");
+    expect(buttons.map((n) => [n.name, n.ref])).toEqual([
+      ["Save", "e6"],
+      ["Cancel", "e7"],
+    ]);
+  });
+
   // Focus is returned on its own, as the ref of the [active] line.
   test("returns focusedRef separately", () => {
-    expect(hidden.focusedRef).toBe("e5");
-    // It is the ref of the "Checkout" button in the merged tree.
-    expect(hidden.tree[0].children.find((n) => n.ref === hidden.focusedRef)?.name).toBe("Checkout");
+    expect(hidden.focusedRef).toBe("e6");
+    // It is the ref of the Save button in the merged tree, not a shifted neighbor.
+    expect(hidden.tree[0].children.find((n) => n.ref === hidden.focusedRef)?.name).toBe("Save");
   });
 
   // With no [active] marker, there is no focused ref.
