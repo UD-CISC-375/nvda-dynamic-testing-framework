@@ -160,8 +160,8 @@ test.describe("parseSnapshot", () => {
     expect(main.find((n) => n.role === "iframe")).toMatchObject({ ref: "e16", children: [] });
   });
 
-  // AI-mode names can differ (they can include aria-hidden text), so they're never compared.
-  test("matches by order and role, never by name", () => {
+  // Names only break ties: when no AI name matches, nodes still pair up by order and role.
+  test("matches by order and role when names differ", () => {
     const { tree } = parseSnapshot({
       content: `- button "Save"\n- button "Cancel"`,
       refs: `- button "Save extra" [ref=e1]\n- button "Different" [ref=e2]`,
@@ -204,6 +204,12 @@ test.describe("parseSnapshot: focus, hidden content and reloads", () => {
       ["Save", "e6"],
       ["Cancel", "e7"],
     ]);
+  });
+
+  // The link inside the aria-hidden div (e9) has no marker, but also no name; the real
+  // "Help" link must win on its name instead of taking e9.
+  test("a node inside an aria-hidden wrapper does not take the next real node's ref", () => {
+    expect(hidden.tree[0].children.find((n) => n.role === "link")).toMatchObject({ name: "Help", ref: "e10" });
   });
 
   // Focus is returned on its own, as the ref of the [active] line.
