@@ -9,16 +9,27 @@ export type TreeSnapshot = {
   refs: string;
 };
 
-// Capture the accessibility tree under `scope` in both modes.
+// How many times snapshotTree retries before giving up on a page that keeps changing.
+const MAX_SNAPSHOT_TRIES = 3;
+
+// Capture the accessibility tree under `scope` in both modes, from the same moment.
+// The two snapshots are separate browser calls, so the page can change in between.
+// Taking content again after refs catches that: if both content reads match, the page
+// didn't change (in a way default mode can see) while refs was being taken.
 export async function snapshotTree(scope: Locator): Promise<TreeSnapshot> {
-  // Take both snapshots in parallel so they're as close together in time as possible.
-  const [content, refs] = await Promise.all([
-    // Default mode: accurate content, no refs or focus.
-    scope.ariaSnapshot(),
+  // Default mode: accurate content, no refs or focus.
+  let content = await scope.ariaSnapshot();
+  for (let attempt = 1; ; attempt++) {
     // AI mode: refs and focus, but leaks aria-hidden text, so it isn't used for content.
-    scope.ariaSnapshot({ mode: "ai" }),
-  ]);
-  return { content, refs };
+    const refs = await scope.ariaSnapshot({ mode: "ai" });
+    // Default mode again, strictly after refs finished.
+    const contentAfter = await scope.ariaSnapshot();
+    // No change around the refs snapshot (or out of tries): the pair goes together.
+    if (contentAfter === content || attempt >= MAX_SNAPSHOT_TRIES)
+      return { content: contentAfter, refs };
+    // The page changed mid-snapshot: start over from the newest content.
+    content = contentAfter;
+  }
 }
 
 // Turn a snapshot into one string that is compared between polls to detect change and settling.
