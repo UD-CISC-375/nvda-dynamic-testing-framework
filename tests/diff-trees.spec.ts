@@ -188,6 +188,104 @@ test.describe("diffTrees: added and removed", () => {
   });
 });
 
+test.describe("diffTrees: name, state and text changes", () => {
+  // The running example: the button expands, a menu opens, the checkbox gets checked.
+  test("reports state changes on pairs and the new menu once", () => {
+    const before = buildTree(
+      [`- main [ref=e1]:`, `  - button "Actions" [ref=e2]`, `  - checkbox "Agree" [ref=e3]`].join("\n"),
+    );
+    const after = buildTree(
+      [
+        `- main [ref=e1]:`,
+        `  - button "Actions" [expanded] [ref=e2]`,
+        `  - menu "Actions" [ref=e4]:`,
+        `    - menuitem "Edit" [ref=e5]`,
+        `  - checkbox "Agree" [checked] [ref=e3]`,
+      ].join("\n"),
+    );
+    expect(diffTrees(before, after)).toEqual([
+      {
+        kind: "stateChanged",
+        path: 'main > button "Actions"',
+        ref: "e2",
+        changes: { expanded: { before: null, after: true } },
+      },
+      { kind: "added", path: 'main > menu "Actions"', ref: "e4", node: after[0].children[1] },
+      {
+        kind: "stateChanged",
+        path: 'main > checkbox "Agree"',
+        ref: "e3",
+        changes: { checked: { before: null, after: true } },
+      },
+    ]);
+  });
+
+  // Valued states keep their strings; every changed key goes into one entry.
+  test("puts every changed state of a node into one stateChanged", () => {
+    const changes = diffTrees(
+      buildTree(`- heading "Intro" [level=2] [ref=e2]`),
+      buildTree(`- heading "Intro" [level=3] [disabled] [ref=e2]`),
+    );
+    expect(changes).toEqual([
+      {
+        kind: "stateChanged",
+        path: 'heading "Intro"',
+        ref: "e2",
+        changes: { level: { before: "2", after: "3" }, disabled: { before: null, after: true } },
+      },
+    ]);
+  });
+
+  // A form field's value is compared like a state, under "value".
+  test("reports a changed form value as stateChanged", () => {
+    const changes = diffTrees(buildTree(`- textbox "Email" [ref=e2]: a@b`), buildTree(`- textbox "Email" [ref=e2]: a@b.c`));
+    expect(changes).toEqual([
+      { kind: "stateChanged", path: 'textbox "Email"', ref: "e2", changes: { value: { before: "a@b", after: "a@b.c" } } },
+    ]);
+  });
+
+  // A new link target (/url) is a state of the link.
+  test("reports a changed link target as stateChanged", () => {
+    const changes = diffTrees(
+      buildTree(`- link "Docs" [ref=e2]:\n  - /url: /v1`),
+      buildTree(`- link "Docs" [ref=e2]:\n  - /url: /v2`),
+    );
+    expect(changes.map((c) => c.kind === "stateChanged" && c.changes)).toEqual([{ url: { before: "/v1", after: "/v2" } }]);
+  });
+
+  // Play -> Pause: same element (same ref), new name.
+  test("reports nameChanged for a renamed node", () => {
+    const changes = diffTrees(buildTree(`- button "Play" [ref=e2]`), buildTree(`- button "Pause" [ref=e2]`));
+    expect(changes).toEqual([{ kind: "nameChanged", path: 'button "Pause"', ref: "e2", before: "Play", after: "Pause" }]);
+  });
+
+  // A status message arriving is text on the status, not a new node.
+  test("reports new text in an existing node as textChanged", () => {
+    const changes = diffTrees(buildTree(`- status [ref=e2]`), buildTree(`- status [ref=e2]: Saved`));
+    expect(changes).toEqual([{ kind: "textChanged", path: "status", ref: "e2", before: "", after: "Saved" }]);
+  });
+
+  // With flattening, text inside a new unnamed span is the parent's text, split or not.
+  test("reads the same text split across unnamed spans as unchanged", () => {
+    const before = buildTree(`- status [ref=e2]: Item added`);
+    const after = buildTree(`- status [ref=e2]:\n  - generic: Item\n  - generic: added`);
+    expect(diffTrees(before, after)).toEqual([]);
+  });
+
+  // Text directly under the virtual root has the empty path.
+  test("reports top-level text changes at the root path", () => {
+    const changes = diffTrees(buildTree(`- text: Loading`), buildTree(`- text: Done`));
+    expect(changes).toEqual([{ kind: "textChanged", path: "", ref: undefined, before: "Loading", after: "Done" }]);
+  });
+
+  // parseLine keeps [active] out of states, so focus moving is never a stateChanged.
+  test("never reports [active] moving between buttons", () => {
+    const before = buildTree(`- button "One" [active] [ref=e2]\n- button "Two" [ref=e3]`);
+    const after = buildTree(`- button "One" [ref=e2]\n- button "Two" [active] [ref=e3]`);
+    expect(diffTrees(before, after)).toEqual([]);
+  });
+});
+
 // These trees are hand-written: real default-mode snapshots never contain generic nodes.
 test.describe("flattenGeneric", () => {
   // Wrappers at any depth disappear and their children join the nearest real ancestor.
