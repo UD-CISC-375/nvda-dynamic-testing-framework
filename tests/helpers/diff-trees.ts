@@ -271,9 +271,10 @@ export type DiffOptions = {
 };
 
 // Report every change between two trees, in document order of the after tree, then removals
-// in document order of the before tree. Both trees must come from the same page load: refs
-// start over after a navigation, so matching refs across loads would pair unrelated nodes
-// (#130 guards against that). Nothing is judged here; #129 decides what counts.
+// in document order of the before tree (minus any merged into replaced). Both trees must come
+// from the same page load: refs start over after a navigation, so matching refs across loads
+// would pair unrelated nodes (#130 guards against that). Nothing is judged here; #129 decides
+// what counts.
 export function diffTrees(
   before: AriaNode[],
   after: AriaNode[],
@@ -335,7 +336,9 @@ export function diffTrees(
     // below it rides along in `node` instead of being reported again.
     else if (parentMatched) changes.push({ kind: "added", path, ref: node.ref, node });
   });
-  return [...changes, ...removed];
+  // An identical copy swapped in can't be matched (new refs), so its removed + added halves
+  // are merged into one replaced entry here, at the added entry's place.
+  return mergeReplaced([...changes, ...removed]);
 }
 
 // Replace each unnamed generic node with its children, so they belong to the nearest real
