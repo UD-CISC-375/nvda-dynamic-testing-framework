@@ -19,12 +19,23 @@ export type DomChange = {
  * BEFORE doing whatever causes the change (e.g. the click), otherwise the
  * change can happen before anyone is listening.
  *
+ * `rootSelector` defaults to "body", which watches the whole page. Use that
+ * when you don't know the page's structure in advance (e.g. someone else's
+ * site); pass a selector to only see changes inside one component.
+ *
+ * Elements are labeled 'tag#id' when they have an id,
+ * 'tag[data-testid="x"]' when they only have a data-testid, and just 'tag'
+ * otherwise.
+ *
+ * Only one watcher per page: a second call on the same page throws, because
+ * exposeFunction can only register "__reportDomChange" once.
+ *
  * Returns:
  *  - changes: the live list of everything recorded so far
  *  - waitFor(isDone, timeoutMs): resolves once isDone(changes) is true,
  *    rejects if that doesn't happen within timeoutMs
  */
-export async function watchDom(page: Page, rootSelector: string) {
+export async function watchDom(page: Page, rootSelector = "body") {
   const changes: DomChange[] = [];
   // Called every time a new change arrives. waitFor() swaps in its own check.
   let onChange = () => {};
@@ -47,10 +58,15 @@ export async function watchDom(page: Page, rootSelector: string) {
     if (!root) throw new Error(`watchDom: nothing matches ${selector}`);
 
     // Turn a DOM node into a short readable label like 'ul#actions-menu'.
-    const describe = (node: Node) =>
-      node instanceof Element
-        ? node.tagName.toLowerCase() + (node.id ? `#${node.id}` : "")
-        : node.nodeName;
+    // Most elements outside a component have no id, so fall back to the
+    // testid ('div[data-testid="toast-region"]') before the bare tag.
+    const describe = (node: Node) => {
+      if (!(node instanceof Element)) return node.nodeName;
+      const tag = node.tagName.toLowerCase();
+      if (node.id) return `${tag}#${node.id}`;
+      const testId = node.getAttribute("data-testid");
+      return testId ? `${tag}[data-testid="${testId}"]` : tag;
+    };
 
     // Regions whose content changes a screen reader announces without the
     // user moving focus there (WCAG 4.1.3 Status Messages).
