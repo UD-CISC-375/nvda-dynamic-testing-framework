@@ -71,6 +71,69 @@ export function childPath(parentPath: string, label: string): string {
   return parentPath ? `${parentPath} > ${label}` : label;
 }
 
+// List every node in a tree, parents before children.
+function allNodes(nodes: AriaNode[], out: AriaNode[] = []): AriaNode[] {
+  for (const node of nodes) {
+    out.push(node);
+    allNodes(node.children, out);
+  }
+  return out;
+}
+
+// Key each sibling that has no ref as [role, name, n], where n counts earlier siblings
+// without refs that have the same role and name. Siblings with refs don't count, so adding
+// one can't shift the keys of the others.
+function keyed(nodes: AriaNode[]): Map<string, AriaNode> {
+  const keys = new Map<string, AriaNode>();
+  // How many ref-free siblings with each role and name have been keyed so far.
+  const seen = new Map<string, number>();
+  for (const node of nodes) {
+    // Nodes with refs belong to the ref pass; text belongs to its parent (textChanged).
+    if (node.ref !== undefined || node.role === "text") continue;
+    // JSON keeps role and name apart even if a name contains any separator we might pick.
+    const base = JSON.stringify([node.role, node.name ?? ""]);
+    const n = seen.get(base) ?? 0;
+    seen.set(base, n + 1);
+    keys.set(JSON.stringify([node.role, node.name ?? "", n]), node);
+  }
+  return keys;
+}
+
+// Match the nodes of two trees from the same page load; returns before node -> after node.
+// Text nodes are never matched: their text is compared on the parent instead.
+export function matchTrees(before: AriaNode[], after: AriaNode[]): Map<AriaNode, AriaNode> {
+  // Every after node with a ref, so a ref is found wherever it is now (moved nodes too).
+  const afterByRef = new Map<string, AriaNode>();
+  for (const node of allNodes(after)) if (node.ref !== undefined) afterByRef.set(node.ref, node);
+
+  const matches = new Map<AriaNode, AriaNode>();
+  // Ref pass: the same ref and the same role is the same element. A changed role (e.g. a role
+  // attribute switched from button to link) has no change kind, so it stays unmatched and
+  // comes out as removed + added. Different refs are never paired anywhere.
+  for (const node of allNodes(before)) {
+    const other = node.ref === undefined ? undefined : afterByRef.get(node.ref);
+    if (other?.role === node.role) matches.set(node, other);
+  }
+
+  // Key pass: sibling lists to search for ref-free pairs. The two top-level lists act as the
+  // children of a virtual root that always matches; every ref pair's children come next, so
+  // ref-free nodes under a moved node are still found.
+  const queue: [AriaNode[], AriaNode[]][] = [[before, after]];
+  for (const [b, a] of matches) queue.push([b.children, a.children]);
+  for (let i = 0; i < queue.length; i++) {
+    // Same key on both sides: the same node. Only nodes without refs have keys.
+    const afterByKey = keyed(queue[i][1]);
+    for (const [key, node] of keyed(queue[i][0])) {
+      const other = afterByKey.get(key);
+      if (!other) continue;
+      matches.set(node, other);
+      // A new pair: its children may hold more ref-free pairs.
+      queue.push([node.children, other.children]);
+    }
+  }
+  return matches;
+}
+
 // Replace each unnamed generic node with its children, so they belong to the nearest real
 // ancestor (an empty <div> or <span> only groups things; only its contents count).
 // Default-mode snapshots already leave out every generic, so on parseSnapshot output this
