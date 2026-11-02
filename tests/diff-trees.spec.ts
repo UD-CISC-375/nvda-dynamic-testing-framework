@@ -1,7 +1,7 @@
 // Import Playwright's test runner and assertion library (no browser is used in this file).
 import { test, expect } from "@playwright/test";
 // buildTree turns hand-written snapshot lines into AriaNode trees for these tests.
-import { buildTree } from "./helpers/parse-snapshot";
+import { buildTree, parseSnapshot } from "./helpers/parse-snapshot";
 // Import the tree diff helpers under test.
 import { childPath, diffTrees, flattenGeneric, matchTrees, nodeLabel } from "./helpers/diff-trees";
 
@@ -347,6 +347,29 @@ test.describe("diffTrees: moved and reordered", () => {
   test("reports reordered top-level nodes at the root path", () => {
     const changes = diffTrees(buildTree(`- banner [ref=e1]\n- main [ref=e2]`), buildTree(`- main [ref=e2]\n- banner [ref=e1]`));
     expect(changes).toEqual([{ kind: "reordered", path: "", ref: undefined, order: [1, 0] }]);
+  });
+});
+
+test.describe("diffTrees: known problems", () => {
+  // Known mergeRefs bug (X2.2, not fixed yet): AI mode lists the contents of an aria-hidden
+  // wrapper with no marker, and an unnamed real node can take a hidden node's ref; every later
+  // unnamed sibling with that role then shifts by one. Harmless while the hidden content stays,
+  // but when it goes away the refs shift back, and matching by ref reports false changes
+  // (including meaningful removed + added) on a page where nothing visible changed.
+  // Today this reports textChanged "Two" -> "One", added Two (e4) and removed One (e2).
+  // Change test.fixme back to test once mergeRefs is fixed.
+  test.fixme("hidden content disappearing does not shift refs and report false changes", () => {
+    // Before: an unnamed hidden paragraph comes first in AI mode, so "One" takes its ref (e2).
+    const before = parseSnapshot({
+      content: `- main:\n  - paragraph: One\n  - paragraph: Two`,
+      refs: `- main [ref=e1]:\n  - paragraph [ref=e2]: HIDDEN\n  - paragraph [ref=e3]: One\n  - paragraph [ref=e4]: Two`,
+    });
+    // After: the hidden paragraph is gone, so "One" gets its real ref (e3) back.
+    const after = parseSnapshot({
+      content: `- main:\n  - paragraph: One\n  - paragraph: Two`,
+      refs: `- main [ref=e1]:\n  - paragraph [ref=e3]: One\n  - paragraph [ref=e4]: Two`,
+    });
+    expect(diffTrees(before.tree, after.tree)).toEqual([]);
   });
 });
 
