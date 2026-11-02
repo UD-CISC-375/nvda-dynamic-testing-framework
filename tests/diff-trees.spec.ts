@@ -1,5 +1,8 @@
 // Import Playwright's test runner and assertion library (no browser is used in this file).
 import { test, expect } from "@playwright/test";
+// readFileSync and join load the captured snapshot pairs.
+import { readFileSync } from "fs";
+import { join } from "path";
 // buildTree turns hand-written snapshot lines into AriaNode trees for these tests.
 import { buildTree, parseSnapshot } from "./helpers/parse-snapshot";
 // Import the tree diff helpers under test.
@@ -370,6 +373,63 @@ test.describe("diffTrees: known problems", () => {
       refs: `- main [ref=e1]:\n  - paragraph [ref=e3]: One\n  - paragraph [ref=e4]: Two`,
     });
     expect(diffTrees(before.tree, after.tree)).toEqual([]);
+  });
+});
+
+// Parse one captured snapshot pair from tests/fixtures/snapshots. These were recorded from
+// real pages by capture-snapshots.spec.ts (CAPTURE=1); re-record them there, not by hand.
+function captured(name: string) {
+  const read = (file: string) => readFileSync(join(__dirname, "fixtures", "snapshots", file), "utf8");
+  return parseSnapshot({ content: read(`${name}.default.yaml`), refs: read(`${name}.ai.yaml`) }).tree;
+}
+
+test.describe("diffTrees on captured pages", () => {
+  // Opening the menu: the button's state changes and one menu subtree is added.
+  test("menu opens", () => {
+    const after = captured("menu-open");
+    const changes = diffTrees(captured("menu-closed"), after);
+    expect(changes).toEqual([
+      {
+        kind: "stateChanged",
+        path: 'button "Actions"',
+        ref: "e3",
+        changes: { expanded: { before: null, after: true } },
+      },
+      { kind: "added", path: 'menu "Actions"', ref: "e9", node: after[1] },
+    ]);
+    // The four items ride along inside the menu instead of being reported one by one.
+    expect(after[1].children.map((n) => n.name)).toEqual(["Duplicate", "Rename", "Archive", "Delete"]);
+  });
+
+  // Sorting by name: the data rows are reordered (each number is a row's old position),
+  // and the status announces the sort. aria-sort isn't in the snapshot, so no stateChanged.
+  test("sortable table → reordered", () => {
+    expect(diffTrees(captured("sortable-unsorted"), captured("sortable-sorted"))).toEqual([
+      { kind: "reordered", path: 'table "Employees" > rowgroup[2]', ref: "e13", order: [2, 1, 0, 3] },
+      { kind: "textChanged", path: "status", ref: "e30", before: "", after: "Sorted by Name, ascending" },
+    ]);
+  });
+
+  // Accessible variant: the message is text inside the status role.
+  test("polite status, accessible → textChanged", () => {
+    expect(diffTrees(captured("polite-accessible-before"), captured("polite-accessible-after"))).toEqual([
+      {
+        kind: "textChanged",
+        path: "status",
+        ref: "e3",
+        before: "",
+        after: "Item added to cart. 1 item in cart.",
+      },
+    ]);
+  });
+
+  // Broken variant: the message is in an unnamed <div>, so after flattening it is text on the
+  // nearest real ancestor. Inside this capture's scope (scenario-root) there is none, so that's
+  // the root, path "". Still textChanged, like the accessible variant, not a new node.
+  test("polite status, broken → textChanged", () => {
+    expect(diffTrees(captured("polite-broken-before"), captured("polite-broken-after"))).toEqual([
+      { kind: "textChanged", path: "", ref: undefined, before: "", after: "Item added to cart. 1 item in cart." },
+    ]);
   });
 });
 
