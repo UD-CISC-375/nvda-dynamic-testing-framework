@@ -251,16 +251,6 @@ test.describe("diffTrees: added and removed", () => {
     expect(diffTrees(before, after).map((c) => [c.kind, c.path])).toEqual([["added", 'listbox > option "B"']]);
   });
 
-  // #128's input: an identical copy with a new ref is removed + added at the same path.
-  test("reports an identical copy with a new ref as removed + added", () => {
-    const before = buildTree(`- main [ref=e1]:\n  - paragraph [ref=e3]: Saved`);
-    const after = buildTree(`- main [ref=e1]:\n  - paragraph [ref=e8]: Saved`);
-    expect(diffTrees(before, after).map((c) => [c.kind, c.path, c.ref])).toEqual([
-      ["added", "main > paragraph", "e8"],
-      ["removed", "main > paragraph", "e3"],
-    ]);
-  });
-
   // A changed role on the same element has no kind of its own.
   test("reports a role change as removed + added", () => {
     const changes = diffTrees(buildTree(`- button "Go" [ref=e2]`), buildTree(`- link "Go" [ref=e2]`));
@@ -279,6 +269,62 @@ test.describe("diffTrees: added and removed", () => {
     expect(diffTrees(before, after, { flatten: false }).map((c) => [c.kind, c.path])).toEqual([
       ["added", "main > generic"],
       ["moved", 'main > generic > button "Save"'],
+    ]);
+  });
+});
+
+test.describe("diffTrees: replaced", () => {
+  // #128's acceptance case: a cloned paragraph swapped in (seen in testing as e3 -> e8) is one
+  // replaced entry, not removed + added.
+  test("reports a cloned paragraph with a new ref as replaced", () => {
+    const before = buildTree(`- main [ref=e1]:\n  - paragraph [ref=e3]: Saved`);
+    const after = buildTree(`- main [ref=e1]:\n  - paragraph [ref=e8]: Saved`);
+    expect(diffTrees(before, after)).toEqual([
+      { kind: "replaced", path: "main > paragraph", ref: "e8", beforeRef: "e3", node: after[0].children[0] },
+    ]);
+  });
+
+  // A cloned subtree has new refs all the way down; it is still one replaced entry.
+  test("reports a cloned list with new refs inside as one replaced", () => {
+    const before = buildTree(`- main [ref=e1]:\n  - list [ref=e3]:\n    - listitem [ref=e4]: Milk`);
+    const after = buildTree(`- main [ref=e1]:\n  - list [ref=e8]:\n    - listitem [ref=e9]: Milk`);
+    expect(diffTrees(before, after).map((c) => [c.kind, c.path, c.ref])).toEqual([["replaced", "main > list", "e8"]]);
+  });
+
+  // The new copy says something else: a real change, so removed + added stay.
+  test("keeps removed + added when the text differs", () => {
+    const before = buildTree(`- main [ref=e1]:\n  - paragraph [ref=e3]: Saved`);
+    const after = buildTree(`- main [ref=e1]:\n  - paragraph [ref=e8]: Saving`);
+    expect(diffTrees(before, after).map((c) => c.kind)).toEqual(["added", "removed"]);
+  });
+
+  // An identical copy that appears somewhere else is one node leaving and another arriving.
+  test("keeps removed + added when the copy is at a different path", () => {
+    const before = buildTree(`- main [ref=e1]:\n  - paragraph [ref=e3]: Saved\n  - region "Notes" [ref=e2]`);
+    const after = buildTree(`- main [ref=e1]:\n  - region "Notes" [ref=e2]:\n    - paragraph [ref=e8]: Saved`);
+    expect(diffTrees(before, after).map((c) => [c.kind, c.path])).toEqual([
+      ["added", 'main > region "Notes" > paragraph'],
+      ["removed", "main > paragraph"],
+    ]);
+  });
+
+  // Removed in one state and added back in a later one: two diffs, plain removed then added.
+  test("does not merge a node removed in one diff and added back in a later one", () => {
+    const shown = buildTree(`- main [ref=e1]:\n  - paragraph [ref=e3]: Saved`);
+    const hidden = buildTree(`- main [ref=e1]`);
+    const shownAgain = buildTree(`- main [ref=e1]:\n  - paragraph [ref=e8]: Saved`);
+    expect(diffTrees(shown, hidden).map((c) => c.kind)).toEqual(["removed"]);
+    expect(diffTrees(hidden, shownAgain).map((c) => c.kind)).toEqual(["added"]);
+  });
+
+  // The wrapper is a new copy but its button kept its ref: refs are ignored when comparing, so
+  // the wrapper is replaced, and the button is reported moved because its old parent is gone.
+  test("reports a new copy around a kept child as replaced + moved", () => {
+    const before = buildTree(`- main [ref=e1]:\n  - region "R" [ref=e3]:\n    - button "Save" [ref=e5]`);
+    const after = buildTree(`- main [ref=e1]:\n  - region "R" [ref=e8]:\n    - button "Save" [ref=e5]`);
+    expect(diffTrees(before, after).map((c) => [c.kind, c.path])).toEqual([
+      ["replaced", 'main > region "R"'],
+      ["moved", 'main > region "R" > button "Save"'],
     ]);
   });
 });
