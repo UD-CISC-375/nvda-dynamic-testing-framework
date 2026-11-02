@@ -431,6 +431,35 @@ test.describe("diffTrees on captured pages", () => {
       { kind: "textChanged", path: "", ref: undefined, before: "", after: "Item added to cart. 1 item in cart." },
     ]);
   });
+
+  // Both unnamed lists gain an identical "Milk" item; only the path ([1] vs [2]) tells
+  // which list each one went into.
+  test("two lists gain an item with the same text, told apart by path", () => {
+    const after = captured("lists-after");
+    expect(diffTrees(captured("lists-before"), after)).toEqual([
+      { kind: "added", path: "main > list[1] > listitem[2]", ref: "e8", node: after[0].children[0].children[1] },
+      { kind: "added", path: "main > list[2] > listitem[2]", ref: "e9", node: after[0].children[1].children[1] },
+    ]);
+  });
+
+  // Checking the box changes one state on an existing node.
+  test("checkbox → stateChanged", () => {
+    expect(diffTrees(captured("checkbox-before"), captured("checkbox-after"))).toEqual([
+      {
+        kind: "stateChanged",
+        path: 'main > checkbox "Agree"',
+        ref: "e4",
+        changes: { checked: { before: null, after: true } },
+      },
+    ]);
+  });
+
+  // Real AI-mode output marks the focused button [active], and the mark moves with focus.
+  // Focus isn't a tree change (it comes from watchDom), so neither move is reported.
+  test("focus moving between two buttons → no change", () => {
+    expect(diffTrees(captured("focus-body"), captured("focus-one"))).toEqual([]);
+    expect(diffTrees(captured("focus-one"), captured("focus-two"))).toEqual([]);
+  });
 });
 
 // These trees are hand-written: real default-mode snapshots never contain generic nodes.
