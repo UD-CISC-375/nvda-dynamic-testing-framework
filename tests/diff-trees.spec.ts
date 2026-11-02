@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 // buildTree turns hand-written snapshot lines into AriaNode trees for these tests.
 import { buildTree } from "./helpers/parse-snapshot";
 // Import the tree diff helpers under test.
-import { childPath, flattenGeneric, nodeLabel } from "./helpers/diff-trees";
+import { childPath, flattenGeneric, matchTrees, nodeLabel } from "./helpers/diff-trees";
 
 test.describe("nodeLabel and childPath", () => {
   // A named node shows its quoted name; an unnamed one shows only its role.
@@ -33,6 +33,80 @@ test.describe("nodeLabel and childPath", () => {
   test("joins labels into the issue's path format", () => {
     const path = childPath(childPath(childPath("", "main"), 'menu "Actions"'), 'menuitem "Edit"');
     expect(path).toBe('main > menu "Actions" > menuitem "Edit"');
+  });
+});
+
+test.describe("matchTrees", () => {
+  // The ref is the identity, so a node that changed its name is still the same node.
+  test("matches by ref even when the name changed", () => {
+    const before = buildTree(`- button "Play" [ref=e2]`);
+    const after = buildTree(`- button "Pause" [ref=e2]`);
+    expect(matchTrees(before, after).get(before[0])).toBe(after[0]);
+  });
+
+  // A node is found by ref even under a different parent (needed for moved).
+  test("matches by ref across parents", () => {
+    const before = buildTree(`- list [ref=e2]:\n  - listitem [ref=e4]: x\n- list [ref=e3]`);
+    const after = buildTree(`- list [ref=e2]\n- list [ref=e3]:\n  - listitem [ref=e4]: x`);
+    expect(matchTrees(before, after).get(before[0].children[0])).toBe(after[1].children[0]);
+  });
+
+  // #128's case: an identical copy swapped in gets a new ref, so it must not match the old one.
+  test("never pairs two nodes with different refs, even if they look the same", () => {
+    const before = buildTree(`- main [ref=e2]:\n  - paragraph [ref=e3]: Saved`);
+    const after = buildTree(`- main [ref=e2]:\n  - paragraph [ref=e8]: Saved`);
+    expect(matchTrees(before, after).has(before[0].children[0])).toBe(false);
+  });
+
+  // A role attribute switched on the same element: no change kind for that, so no match.
+  test("does not match the same ref with a different role", () => {
+    const before = buildTree(`- button "Go" [ref=e2]`);
+    const after = buildTree(`- link "Go" [ref=e2]`);
+    expect(matchTrees(before, after).has(before[0])).toBe(false);
+  });
+
+  // Ref-free nodes pair by role + name + position under a matched parent.
+  test("matches ref-free nodes by role, name and position", () => {
+    const before = buildTree(`- listbox [ref=e2]:\n  - option "A"\n  - option "B"\n  - option "A"`);
+    const after = buildTree(`- listbox [ref=e2]:\n  - option "B"\n  - option "A"\n  - option "A"`);
+    const matches = matchTrees(before, after);
+    const [a1, b, a2] = before[0].children;
+    expect(matches.get(a1)).toBe(after[0].children[1]);
+    expect(matches.get(b)).toBe(after[0].children[0]);
+    expect(matches.get(a2)).toBe(after[0].children[2]);
+  });
+
+  // A new sibling with a ref (and the same role and name) doesn't shift the ref-free one's key.
+  test("counts positions among ref-free siblings only", () => {
+    const before = buildTree(`- listbox [ref=e2]:\n  - option "A"`);
+    const after = buildTree(`- listbox [ref=e2]:\n  - option "A" [ref=e9]\n  - option "A"`);
+    const matches = matchTrees(before, after);
+    expect(matches.get(before[0].children[0])).toBe(after[0].children[1]);
+    expect([...matches.values()]).not.toContain(after[0].children[0]);
+  });
+
+  // Top-level nodes hang under a virtual root that always matches.
+  test("matches ref-free top-level nodes", () => {
+    const before = buildTree(`- heading "Title" [level=1]\n- paragraph: old`);
+    const after = buildTree(`- heading "Title" [level=1]\n- paragraph: new`);
+    const matches = matchTrees(before, after);
+    expect(matches.get(before[0])).toBe(after[0]);
+    expect(matches.get(before[1])).toBe(after[1]);
+  });
+
+  // Ref-free children of a node that moved are still matched under it.
+  test("matches ref-free children of a moved node", () => {
+    const before = buildTree(`- region "A" [ref=e2]:\n  - listbox [ref=e4]:\n    - option "X"\n- region "B" [ref=e3]`);
+    const after = buildTree(`- region "A" [ref=e2]\n- region "B" [ref=e3]:\n  - listbox [ref=e4]:\n    - option "X"`);
+    const option = before[0].children[0].children[0];
+    expect(matchTrees(before, after).get(option)).toBe(after[1].children[0].children[0]);
+  });
+
+  // A ref-free node under an unmatched parent has nothing to be matched against.
+  test("does not match ref-free nodes whose parents didn't match", () => {
+    const before = buildTree(`- list [ref=e2]:\n  - listitem: x`);
+    const after = buildTree(`- list [ref=e9]:\n  - listitem: x`);
+    expect(matchTrees(before, after).size).toBe(0);
   });
 });
 
