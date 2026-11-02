@@ -195,9 +195,18 @@ function comparePair(b: AriaNode, a: AriaNode, path: string): TreeChange[] {
   return changes;
 }
 
-// The virtual root as a node, so top-level text is compared like any other node's text.
+// The virtual root as a node, so top-level nodes have a parent like any other node.
 function rootOf(nodes: AriaNode[]): AriaNode {
   return { role: "root", states: {}, children: nodes };
+}
+
+// Map every node under `root` to its parent; top-level nodes map to the root itself.
+function parentsOf(root: AriaNode, out = new Map<AriaNode, AriaNode>()): Map<AriaNode, AriaNode> {
+  for (const child of root.children) {
+    out.set(child, root);
+    parentsOf(child, out);
+  }
+  return out;
 }
 
 // Options for diffTrees.
@@ -221,24 +230,58 @@ export function diffTrees(
     before = flattenGeneric(before);
     after = flattenGeneric(after);
   }
-  const matches = matchTrees(before, after);
+  // The virtual roots are real nodes here and always partners, so top-level nodes have a
+  // parent pair like everyone else (for moved, reordered and top-level text).
+  const [rootBefore, rootAfter] = [rootOf(before), rootOf(after)];
+  const matches = matchTrees(before, after).set(rootBefore, rootAfter);
   // The same pairs looked up from the after side: after node -> before node.
   const partnerOf = new Map([...matches].map(([b, a]) => [a, b]));
-  // Text directly under the virtual root (top-level text) has the empty path.
-  const changes = comparePair(rootOf(before), rootOf(after), "");
+  const parentBefore = parentsOf(rootBefore);
+  const parentAfter = parentsOf(rootAfter);
 
+  // Walk the before tree first: moved needs each node's old path for `from`. Removals are
+  // held back so they still come out after everything from the after tree.
+  const pathBefore = new Map<AriaNode, string>();
+  const removed: TreeChange[] = [];
+  visit(before, (n) => matches.has(n), (node, path, matched, parentMatched) => {
+    pathBefore.set(node, path);
+    // Same rule as added below: report a removed subtree once, at its root.
+    if (!matched && parentMatched) removed.push({ kind: "removed", path, ref: node.ref, node });
+  });
+
+  // Everything that changed on one pair: moved, then its own name/state/text, then its
+  // children's order.
+  const pairChanges = (b: AriaNode, a: AriaNode, path: string): TreeChange[] => {
+    const changes: TreeChange[] = [];
+    // Where it would be if it hadn't moved: the partner of its old parent. Roots have no parent.
+    if (b !== rootBefore && matches.get(parentBefore.get(b)!) !== parentAfter.get(a)) {
+      changes.push({ kind: "moved", path, ref: a.ref, from: pathBefore.get(b)! });
+    }
+    changes.push(...comparePair(b, a, path));
+    // The children that stayed under this pair (not added, removed or moved), in before order.
+    const stayed = b.children.filter((c) => {
+      const partner = matches.get(c);
+      return partner !== undefined && parentAfter.get(partner) === a;
+    });
+    // The same children in after order, each as its index in `stayed`; others are skipped.
+    const order = a.children
+      .map((c) => stayed.findIndex((s) => matches.get(s) === c))
+      .filter((i) => i !== -1);
+    // Any index out of place means the order changed.
+    if (order.some((n, i) => n !== i)) changes.push({ kind: "reordered", path, ref: a.ref, order });
+    return changes;
+  };
+
+  // The root pair first: top-level text and order, at the empty path.
+  const changes = pairChanges(rootBefore, rootAfter, "");
   visit(after, (n) => partnerOf.has(n), (node, path, matched, parentMatched) => {
-    // A pair: report what changed on the node itself.
-    if (matched) changes.push(...comparePair(partnerOf.get(node)!, node, path));
+    // A pair: report what changed on it.
+    if (matched) changes.push(...pairChanges(partnerOf.get(node)!, node, path));
     // A new node whose parent existed before is the root of an added subtree; anything
     // below it rides along in `node` instead of being reported again.
     else if (parentMatched) changes.push({ kind: "added", path, ref: node.ref, node });
   });
-  // The same rule from the before side: report a removed subtree once, at its root.
-  visit(before, (n) => matches.has(n), (node, path, matched, parentMatched) => {
-    if (!matched && parentMatched) changes.push({ kind: "removed", path, ref: node.ref, node });
-  });
-  return changes;
+  return [...changes, ...removed];
 }
 
 // Replace each unnamed generic node with its children, so they belong to the nearest real
