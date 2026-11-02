@@ -3,7 +3,38 @@ import { test, expect } from "@playwright/test";
 // buildTree turns hand-written snapshot lines into AriaNode trees for these tests.
 import { buildTree } from "./helpers/parse-snapshot";
 // Import the tree diff helpers under test.
-import { flattenGeneric } from "./helpers/diff-trees";
+import { childPath, flattenGeneric, nodeLabel } from "./helpers/diff-trees";
+
+test.describe("nodeLabel and childPath", () => {
+  // A named node shows its quoted name; an unnamed one shows only its role.
+  test("labels a node by role and quoted name", () => {
+    const nodes = buildTree(`- button "Save"\n- list`);
+    expect(nodes.map((n) => nodeLabel(n, nodes))).toEqual(['button "Save"', "list"]);
+  });
+
+  // Quotes inside a name are escaped, the same way the snapshot writes them.
+  test("escapes quotes in names", () => {
+    const nodes = buildTree(`- heading "Say \\"hi\\"" [level=2]`);
+    expect(nodeLabel(nodes[0], nodes)).toBe('heading "Say \\"hi\\""');
+  });
+
+  // [n] appears only on siblings that share role and name, and counts from 1.
+  test("adds a position only when siblings share role and name", () => {
+    const nodes = buildTree(`- list\n- button "Save"\n- list\n- button "Help"`);
+    expect(nodes.map((n) => nodeLabel(n, nodes))).toEqual([
+      "list[1]",
+      'button "Save"',
+      "list[2]",
+      'button "Help"',
+    ]);
+  });
+
+  // Top-level nodes start from the empty root path; deeper ones are joined with " > ".
+  test("joins labels into the issue's path format", () => {
+    const path = childPath(childPath(childPath("", "main"), 'menu "Actions"'), 'menuitem "Edit"');
+    expect(path).toBe('main > menu "Actions" > menuitem "Edit"');
+  });
+});
 
 // These trees are hand-written: real default-mode snapshots never contain generic nodes.
 test.describe("flattenGeneric", () => {
