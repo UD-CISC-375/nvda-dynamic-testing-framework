@@ -6,7 +6,7 @@ import { join } from "path";
 // buildTree turns hand-written snapshot lines into AriaNode trees for these tests.
 import { buildTree, parseSnapshot } from "./helpers/parse-snapshot";
 // Import the tree diff helpers under test.
-import { childPath, diffTrees, flattenGeneric, matchTrees, nodeLabel } from "./helpers/diff-trees";
+import { childPath, diffTrees, flattenGeneric, matchTrees, nodeLabel, sameSubtree } from "./helpers/diff-trees";
 
 test.describe("nodeLabel and childPath", () => {
   // A named node shows its quoted name; an unnamed one shows only its role.
@@ -110,6 +110,45 @@ test.describe("matchTrees", () => {
     const before = buildTree(`- list [ref=e2]:\n  - listitem: x`);
     const after = buildTree(`- list [ref=e9]:\n  - listitem: x`);
     expect(matchTrees(before, after).size).toBe(0);
+  });
+});
+
+test.describe("sameSubtree", () => {
+  // Compare the first top-level node of two hand-written trees.
+  const same = (a: string, b: string) => sameSubtree(buildTree(a)[0], buildTree(b)[0]);
+
+  // A clone gets new refs all the way down; that alone doesn't make it different.
+  test("ignores refs at every depth", () => {
+    const before = `- list [ref=e3]:\n  - listitem [ref=e4]:\n    - link "Docs" [ref=e5]`;
+    const after = `- list [ref=e8]:\n  - listitem [ref=e9]:\n    - link "Docs" [ref=e10]`;
+    expect(same(before, after)).toBe(true);
+  });
+
+  // A node with a ref and its copy without one are still the same content.
+  test("ignores a ref present on only one side", () => {
+    expect(same(`- paragraph [ref=e3]: Saved`, `- paragraph: Saved`)).toBe(true);
+  });
+
+  // States are compared as a set, not in the order they were written.
+  test("ignores the order states were written in", () => {
+    expect(same(`- button "Go" [disabled] [pressed]`, `- button "Go" [pressed] [disabled]`)).toBe(true);
+  });
+
+  // Any difference in content, at any depth, makes it a different subtree.
+  test("notices a different role, name, state, value or text", () => {
+    expect(same(`- button "Go"`, `- link "Go"`)).toBe(false);
+    expect(same(`- button "Go"`, `- button "Stop"`)).toBe(false);
+    expect(same(`- checkbox "A"`, `- checkbox "A" [checked]`)).toBe(false);
+    expect(same(`- heading "T" [level=2]`, `- heading "T" [level=3]`)).toBe(false);
+    expect(same(`- textbox "E": a@b`, `- textbox "E": a@b.c`)).toBe(false);
+    expect(same(`- main:\n  - paragraph: Saved`, `- main:\n  - paragraph: Saving`)).toBe(false);
+  });
+
+  // Children are compared in order and by count.
+  test("notices children added, removed or in a new order", () => {
+    const ab = `- list:\n  - listitem: A\n  - listitem: B`;
+    expect(same(ab, `- list:\n  - listitem: A`)).toBe(false);
+    expect(same(ab, `- list:\n  - listitem: B\n  - listitem: A`)).toBe(false);
   });
 });
 

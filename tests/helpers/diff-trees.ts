@@ -170,6 +170,19 @@ function statesOf(node: AriaNode): Record<string, string | true> {
   return node.value === undefined ? node.states : { ...node.states, value: node.value };
 }
 
+// Whether two subtrees are the same apart from refs: role, name, states, value (a text node's
+// text too) and children, in order. A cloned element gets a new ref on every node inside it,
+// so refs are skipped at every depth; #128 uses this to find identical copies swapped in.
+export function sameSubtree(a: AriaNode, b: AriaNode): boolean {
+  // `?? ""`: an empty name and no name both mean "no name", as in nodeLabel.
+  if (a.role !== b.role || (a.name ?? "") !== (b.name ?? "") || a.value !== b.value) return false;
+  // The same state keys with the same values; the order they were written in doesn't matter.
+  const keys = Object.keys(a.states);
+  if (keys.length !== Object.keys(b.states).length || keys.some((k) => a.states[k] !== b.states[k])) return false;
+  // The same number of children, each the same as the child at its position on the other side.
+  return a.children.length === b.children.length && a.children.every((c, i) => sameSubtree(c, b.children[i]));
+}
+
 // The name, state and text changes between two partners, reported at the after node's path.
 function comparePair(b: AriaNode, a: AriaNode, path: string): TreeChange[] {
   const changes: TreeChange[] = [];
