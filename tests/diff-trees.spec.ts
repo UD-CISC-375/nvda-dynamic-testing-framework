@@ -181,9 +181,10 @@ test.describe("diffTrees: added and removed", () => {
     const before = buildTree(`- main [ref=e1]:\n  - button "Save" [ref=e2]`);
     const after = buildTree(`- main [ref=e1]:\n  - generic:\n    - button "Save" [ref=e2]`);
     expect(diffTrees(before, after)).toEqual([]);
-    // With flattening off, the wrapper itself is a new node.
+    // With flattening off, the wrapper itself is a new node and the button moved into it.
     expect(diffTrees(before, after, { flatten: false }).map((c) => [c.kind, c.path])).toEqual([
       ["added", "main > generic"],
+      ["moved", 'main > generic > button "Save"'],
     ]);
   });
 });
@@ -283,6 +284,69 @@ test.describe("diffTrees: name, state and text changes", () => {
     const before = buildTree(`- button "One" [active] [ref=e2]\n- button "Two" [ref=e3]`);
     const after = buildTree(`- button "One" [ref=e2]\n- button "Two" [active] [ref=e3]`);
     expect(diffTrees(before, after)).toEqual([]);
+  });
+});
+
+test.describe("diffTrees: moved and reordered", () => {
+  // Same ref, new parent: moved, with the old path in `from`. Paths differ only by [n].
+  test("reports a node that changed parent as moved", () => {
+    const before = buildTree(`- list [ref=e2]:\n  - listitem [ref=e4]: Milk\n- list [ref=e3]`);
+    const after = buildTree(`- list [ref=e2]\n- list [ref=e3]:\n  - listitem [ref=e4]: Milk`);
+    expect(diffTrees(before, after)).toEqual([
+      { kind: "moved", path: "list[2] > listitem", ref: "e4", from: "list[1] > listitem" },
+    ]);
+  });
+
+  // Moved into a brand-new container: added for the container, moved for the node. The added
+  // node's payload still holds the moved node (it isn't pruned; see TreeChange).
+  test("reports a node moved into a new container as added + moved", () => {
+    const before = buildTree(`- main [ref=e1]:\n  - button "Save" [ref=e2]`);
+    const after = buildTree(`- main [ref=e1]:\n  - dialog "Confirm" [ref=e5]:\n    - button "Save" [ref=e2]`);
+    expect(diffTrees(before, after).map((c) => [c.kind, c.path])).toEqual([
+      ["added", 'main > dialog "Confirm"'],
+      ["moved", 'main > dialog "Confirm" > button "Save"'],
+    ]);
+  });
+
+  // Moved out of a container that was removed: moved for the node, removed for the container.
+  test("reports a node moved out of a removed container as moved + removed", () => {
+    const before = buildTree(`- main [ref=e1]:\n  - dialog "Confirm" [ref=e5]:\n    - button "Save" [ref=e2]`);
+    const after = buildTree(`- main [ref=e1]:\n  - button "Save" [ref=e2]`);
+    expect(diffTrees(before, after)).toEqual([
+      { kind: "moved", path: 'main > button "Save"', ref: "e2", from: 'main > dialog "Confirm" > button "Save"' },
+      { kind: "removed", path: 'main > dialog "Confirm"', ref: "e5", node: before[0].children[0] },
+    ]);
+  });
+
+  // Rows sorted the other way: one reordered on the parent; order gives each row's old index.
+  test("reports siblings in a new order as reordered", () => {
+    const before = buildTree(
+      `- rowgroup [ref=e2]:\n  - row "Ann" [ref=e3]\n  - row "Bob" [ref=e4]\n  - row "Cy" [ref=e5]`,
+    );
+    const after = buildTree(
+      `- rowgroup [ref=e2]:\n  - row "Cy" [ref=e5]\n  - row "Ann" [ref=e3]\n  - row "Bob" [ref=e4]`,
+    );
+    expect(diffTrees(before, after)).toEqual([{ kind: "reordered", path: "rowgroup", ref: "e2", order: [2, 0, 1] }]);
+  });
+
+  // Ref-free siblings are matched by key, so swapping them is a reorder too.
+  test("reports ref-free siblings in a new order as reordered", () => {
+    const before = buildTree(`- listbox [ref=e2]:\n  - option "A"\n  - option "B"`);
+    const after = buildTree(`- listbox [ref=e2]:\n  - option "B"\n  - option "A"`);
+    expect(diffTrees(before, after)).toEqual([{ kind: "reordered", path: "listbox", ref: "e2", order: [1, 0] }]);
+  });
+
+  // Inserting or removing a sibling shifts positions but isn't a reorder.
+  test("does not report an insertion or removal as reordered", () => {
+    const list = (items: string[]) => buildTree(`- list [ref=e1]:\n` + items.map((i) => `  - listitem [ref=${i}]`).join("\n"));
+    expect(diffTrees(list(["e2", "e3"]), list(["e9", "e2", "e3"])).map((c) => c.kind)).toEqual(["added"]);
+    expect(diffTrees(list(["e2", "e3"]), list(["e3"])).map((c) => c.kind)).toEqual(["removed"]);
+  });
+
+  // Top-level nodes are children of the virtual root, so their order is checked at "".
+  test("reports reordered top-level nodes at the root path", () => {
+    const changes = diffTrees(buildTree(`- banner [ref=e1]\n- main [ref=e2]`), buildTree(`- main [ref=e2]\n- banner [ref=e1]`));
+    expect(changes).toEqual([{ kind: "reordered", path: "", ref: undefined, order: [1, 0] }]);
   });
 });
 
