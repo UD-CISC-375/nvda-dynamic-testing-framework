@@ -52,7 +52,17 @@ export type TreeChange = ChangeBase &
         // The node's path in the before tree; `path` is where it is now.
         from: string;
       }
+    | {
+        kind: "replaced";
+        // The removed copy's ref; `ref` is the new copy's. Kept for reports only: that element is gone.
+        beforeRef?: string;
+        // The new copy's subtree (from the after tree); the removed one was the same apart from refs.
+        node: AriaNode;
+      }
   );
+
+// An added or removed entry, the two halves mergeReplaced pairs up.
+type SubtreeChange = Extract<TreeChange, { kind: "added" | "removed" }>;
 
 // Label one node for a path: its role, its quoted name if it has one, and [n] (1-based) only
 // when a sibling has the same role and name, so two unnamed lists read `list[1]` and `list[2]`.
@@ -181,6 +191,37 @@ export function sameSubtree(a: AriaNode, b: AriaNode): boolean {
   if (keys.length !== Object.keys(b.states).length || keys.some((k) => a.states[k] !== b.states[k])) return false;
   // The same number of children, each the same as the child at its position on the other side.
   return a.children.length === b.children.length && a.children.every((c, i) => sameSubtree(c, b.children[i]));
+}
+
+// Merge each removed entry with the added entry at the same path into one replaced entry, when
+// their subtrees are the same apart from refs. A framework swapping in an identical copy gives
+// it new refs, so matching can't pair it (#128). The replaced entry takes the added entry's
+// place. This only detects it; #129 decides whether it counts.
+export function mergeReplaced(changes: TreeChange[]): TreeChange[] {
+  // Removed entries by path. Paths are unique within one tree, so a path has at most one.
+  const removedAt = new Map<string, SubtreeChange>();
+  for (const c of changes) if (c.kind === "removed") removedAt.set(c.path, c);
+
+  // Each added entry with an identical removed entry at its path -> that removed entry.
+  const pairs = new Map<TreeChange, SubtreeChange>();
+  for (const c of changes) {
+    const gone = c.kind === "added" ? removedAt.get(c.path) : undefined;
+    if (c.kind !== "added" || !gone || !sameSubtree(gone.node, c.node)) continue;
+    pairs.set(c, gone);
+    // Used up, so no other added entry can pair with it (only possible in hand-built lists).
+    removedAt.delete(c.path);
+  }
+
+  // The removed half of every pair, left out below because its replaced entry stands for it.
+  const used = new Set<TreeChange>(pairs.values());
+  return changes.flatMap((c): TreeChange[] => {
+    if (used.has(c)) return [];
+    const gone = pairs.get(c);
+    // Not paired: kept as it was. (Only added entries are paired; the kind check tells TypeScript.)
+    if (!gone || c.kind !== "added") return [c];
+    // Both halves as one entry, with the new copy's ref and subtree and the old copy's ref.
+    return [{ kind: "replaced", path: c.path, ref: c.ref, beforeRef: gone.ref, node: c.node }];
+  });
 }
 
 // The name, state and text changes between two partners, reported at the after node's path.
