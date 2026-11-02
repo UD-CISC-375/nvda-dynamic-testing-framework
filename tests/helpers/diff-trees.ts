@@ -134,6 +134,64 @@ export function matchTrees(before: AriaNode[], after: AriaNode[]): Map<AriaNode,
   return matches;
 }
 
+// Visit every non-text node in document order with its path, whether it has a partner in the
+// other tree, and whether its parent does (top-level nodes: the virtual root always does).
+// Unmatched subtrees are still entered, so nodes matched inside them (moved) are seen too.
+function visit(
+  nodes: AriaNode[],
+  isMatched: (node: AriaNode) => boolean,
+  fn: (node: AriaNode, path: string, matched: boolean, parentMatched: boolean) => void,
+  parentPath = "",
+  parentMatched = true,
+): void {
+  for (const node of nodes) {
+    // Text belongs to its parent and is compared there (textChanged).
+    if (node.role === "text") continue;
+    const path = childPath(parentPath, nodeLabel(node, nodes));
+    const matched = isMatched(node);
+    fn(node, path, matched, parentMatched);
+    visit(node.children, isMatched, fn, path, matched);
+  }
+}
+
+// Options for diffTrees.
+export type DiffOptions = {
+  // Lift the children of unnamed generic wrappers into their parents first, so only a
+  // wrapper's contents count. On by default.
+  flatten?: boolean;
+};
+
+// Report every change between two trees, in document order of the after tree, then removals
+// in document order of the before tree. Both trees must come from the same page load: refs
+// start over after a navigation, so matching refs across loads would pair unrelated nodes
+// (#130 guards against that). Nothing is judged here; #129 decides what counts.
+export function diffTrees(
+  before: AriaNode[],
+  after: AriaNode[],
+  { flatten = true }: DiffOptions = {},
+): TreeChange[] {
+  // Compare wrapper-free copies, unless the caller wants wrappers kept.
+  if (flatten) {
+    before = flattenGeneric(before);
+    after = flattenGeneric(after);
+  }
+  const matches = matchTrees(before, after);
+  // The after nodes that have a before partner.
+  const matchedAfter = new Set(matches.values());
+  const changes: TreeChange[] = [];
+
+  // A new node whose parent existed before is the root of an added subtree; anything
+  // below it rides along in `node` instead of being reported again.
+  visit(after, (n) => matchedAfter.has(n), (node, path, matched, parentMatched) => {
+    if (!matched && parentMatched) changes.push({ kind: "added", path, ref: node.ref, node });
+  });
+  // The same rule from the before side: report a removed subtree once, at its root.
+  visit(before, (n) => matches.has(n), (node, path, matched, parentMatched) => {
+    if (!matched && parentMatched) changes.push({ kind: "removed", path, ref: node.ref, node });
+  });
+  return changes;
+}
+
 // Replace each unnamed generic node with its children, so they belong to the nearest real
 // ancestor (an empty <div> or <span> only groups things; only its contents count).
 // Default-mode snapshots already leave out every generic, so on parseSnapshot output this

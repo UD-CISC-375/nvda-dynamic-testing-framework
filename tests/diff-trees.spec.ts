@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 // buildTree turns hand-written snapshot lines into AriaNode trees for these tests.
 import { buildTree } from "./helpers/parse-snapshot";
 // Import the tree diff helpers under test.
-import { childPath, flattenGeneric, matchTrees, nodeLabel } from "./helpers/diff-trees";
+import { childPath, diffTrees, flattenGeneric, matchTrees, nodeLabel } from "./helpers/diff-trees";
 
 test.describe("nodeLabel and childPath", () => {
   // A named node shows its quoted name; an unnamed one shows only its role.
@@ -107,6 +107,84 @@ test.describe("matchTrees", () => {
     const before = buildTree(`- list [ref=e2]:\n  - listitem: x`);
     const after = buildTree(`- list [ref=e9]:\n  - listitem: x`);
     expect(matchTrees(before, after).size).toBe(0);
+  });
+});
+
+test.describe("diffTrees: added and removed", () => {
+  // Nothing changed: nothing reported.
+  test("reports nothing for identical trees", () => {
+    const tree = `- main [ref=e1]:\n  - button "Save" [ref=e2]`;
+    expect(diffTrees(buildTree(tree), buildTree(tree))).toEqual([]);
+  });
+
+  // A menu opening is one added subtree; its items ride along instead of being reported again.
+  test("reports an added subtree once, at its root", () => {
+    const before = buildTree(`- main [ref=e1]:\n  - button "Actions" [ref=e2]`);
+    const after = buildTree(
+      [
+        `- main [ref=e1]:`,
+        `  - button "Actions" [ref=e2]`,
+        `  - menu "Actions" [ref=e4]:`,
+        `    - menuitem "Edit" [ref=e5]`,
+        `    - menuitem "Delete" [ref=e6]`,
+      ].join("\n"),
+    );
+    const changes = diffTrees(before, after);
+    expect(changes).toEqual([
+      { kind: "added", path: 'main > menu "Actions"', ref: "e4", node: after[0].children[1] },
+    ]);
+  });
+
+  // The menu closing: one removed, with the path from the before tree.
+  test("reports a removed subtree once, at its root", () => {
+    const before = buildTree(`- main [ref=e1]:\n  - menu "Actions" [ref=e4]:\n    - menuitem "Edit" [ref=e5]`);
+    const after = buildTree(`- main [ref=e1]`);
+    expect(diffTrees(before, after)).toEqual([
+      { kind: "removed", path: 'main > menu "Actions"', ref: "e4", node: before[0].children[0] },
+    ]);
+  });
+
+  // Top-level nodes have the virtual root as their parent, so they are reported too.
+  test("reports added top-level nodes", () => {
+    const changes = diffTrees(buildTree(`- main [ref=e1]`), buildTree(`- main [ref=e1]\n- dialog "Confirm" [ref=e9]`));
+    expect(changes.map((c) => [c.kind, c.path])).toEqual([["added", 'dialog "Confirm"']]);
+  });
+
+  // A ref-free node with no partner by key is added too.
+  test("reports an added ref-free node", () => {
+    const before = buildTree(`- listbox [ref=e2]:\n  - option "A"`);
+    const after = buildTree(`- listbox [ref=e2]:\n  - option "A"\n  - option "B"`);
+    expect(diffTrees(before, after).map((c) => [c.kind, c.path])).toEqual([["added", 'listbox > option "B"']]);
+  });
+
+  // #128's input: an identical copy with a new ref is removed + added at the same path.
+  test("reports an identical copy with a new ref as removed + added", () => {
+    const before = buildTree(`- main [ref=e1]:\n  - paragraph [ref=e3]: Saved`);
+    const after = buildTree(`- main [ref=e1]:\n  - paragraph [ref=e8]: Saved`);
+    expect(diffTrees(before, after).map((c) => [c.kind, c.path, c.ref])).toEqual([
+      ["added", "main > paragraph", "e8"],
+      ["removed", "main > paragraph", "e3"],
+    ]);
+  });
+
+  // A changed role on the same element has no kind of its own.
+  test("reports a role change as removed + added", () => {
+    const changes = diffTrees(buildTree(`- button "Go" [ref=e2]`), buildTree(`- link "Go" [ref=e2]`));
+    expect(changes.map((c) => [c.kind, c.path])).toEqual([
+      ["added", 'link "Go"'],
+      ["removed", 'button "Go"'],
+    ]);
+  });
+
+  // An unnamed wrapper appearing around existing content counts only by its contents (none new).
+  test("flattens unnamed generic wrappers by default", () => {
+    const before = buildTree(`- main [ref=e1]:\n  - button "Save" [ref=e2]`);
+    const after = buildTree(`- main [ref=e1]:\n  - generic:\n    - button "Save" [ref=e2]`);
+    expect(diffTrees(before, after)).toEqual([]);
+    // With flattening off, the wrapper itself is a new node.
+    expect(diffTrees(before, after, { flatten: false }).map((c) => [c.kind, c.path])).toEqual([
+      ["added", "main > generic"],
+    ]);
   });
 });
 
