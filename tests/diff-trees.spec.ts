@@ -591,6 +591,15 @@ test.describe("diffTrees on captured pages", () => {
     ]);
   });
 
+  // A real cloneNode swap: Chromium gives the copy a new ref (e3 -> e5), so it is replaced.
+  // Clicking also marks the button [active], which isn't a change (focus comes from watchDom).
+  test("paragraph swapped for a clone → replaced", () => {
+    const after = captured("clone-after");
+    expect(diffTrees(captured("clone-before"), after)).toEqual([
+      { kind: "replaced", path: "main > paragraph", ref: "e5", beforeRef: "e3", node: after[0].children[0] },
+    ]);
+  });
+
   // Real AI-mode output marks the focused button [active], and the mark moves with focus.
   // Focus isn't a tree change (it comes from watchDom), so neither move is reported.
   test("focus moving between two buttons → no change", () => {

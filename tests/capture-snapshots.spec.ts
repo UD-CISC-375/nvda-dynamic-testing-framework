@@ -90,6 +90,26 @@ test("checkbox", async ({ page }) => {
   await save("checkbox-after", scope);
 });
 
+// A paragraph is swapped for an identical clone: same content, new element, so a new ref (#128).
+test("clone", async ({ page }) => {
+  await page.setContent(`
+    <main>
+      <p>Saved</p>
+      <button onclick="const p = document.querySelector('p'); p.replaceWith(p.cloneNode(true))">
+        Re-render
+      </button>
+    </main>`);
+  const scope = page.locator("body");
+  // Hold on to the original element, to check below that it really was swapped out.
+  const original = await page.locator("p").elementHandle();
+  await save("clone-before", scope);
+  await page.getByRole("button", { name: "Re-render" }).click();
+  // The old <p> is detached and a new one stands in its place with the same text.
+  expect(await original!.evaluate((el) => el.isConnected)).toBe(false);
+  await expect(page.locator("p")).toHaveText("Saved");
+  await save("clone-after", scope);
+});
+
 // Focus moves from the page to one button, then to the other; nothing else changes.
 test("focus", async ({ page }) => {
   await page.setContent(`<main><button>One</button><button>Two</button></main>`);
