@@ -6,7 +6,17 @@ import { join } from "path";
 // buildTree turns hand-written snapshot lines into AriaNode trees for these tests.
 import { buildTree, parseSnapshot } from "./helpers/parse-snapshot";
 // Import the tree diff helpers under test.
-import { childPath, diffTrees, flattenGeneric, matchTrees, nodeLabel, sameSubtree } from "./helpers/diff-trees";
+import {
+  childPath,
+  diffTrees,
+  flattenGeneric,
+  matchTrees,
+  mergeReplaced,
+  nodeLabel,
+  sameSubtree,
+} from "./helpers/diff-trees";
+// TreeChange types the hand-built change lists in the mergeReplaced tests.
+import type { TreeChange } from "./helpers/diff-trees";
 
 test.describe("nodeLabel and childPath", () => {
   // A named node shows its quoted name; an unnamed one shows only its role.
@@ -149,6 +159,48 @@ test.describe("sameSubtree", () => {
     const ab = `- list:\n  - listitem: A\n  - listitem: B`;
     expect(same(ab, `- list:\n  - listitem: A`)).toBe(false);
     expect(same(ab, `- list:\n  - listitem: B\n  - listitem: A`)).toBe(false);
+  });
+});
+
+// These change lists are hand-built, so each rule is tested without diffTrees in the way.
+test.describe("mergeReplaced", () => {
+  // One node from a one-line snapshot.
+  const node = (line: string) => buildTree(line)[0];
+  // The cloned paragraph: the same content, a new ref.
+  const added: TreeChange = { kind: "added", path: "main > paragraph", ref: "e8", node: node(`- paragraph [ref=e8]: Saved`) };
+  const removed: TreeChange = { kind: "removed", path: "main > paragraph", ref: "e3", node: node(`- paragraph [ref=e3]: Saved`) };
+  // An unrelated change that must pass through untouched.
+  const status: TreeChange = { kind: "textChanged", path: "status", ref: "e5", before: "", after: "Saved" };
+
+  // The pair becomes one replaced entry where the added one was; the removed one is gone.
+  test("merges an identical removed/added pair at the same path", () => {
+    expect(mergeReplaced([added, status, removed])).toEqual([
+      { kind: "replaced", path: "main > paragraph", ref: "e8", beforeRef: "e3", node: added.node },
+      status,
+    ]);
+  });
+
+  // The pair is found whichever half comes first in the list.
+  test("merges the pair when the removed entry comes first", () => {
+    expect(mergeReplaced([removed, added]).map((c) => c.kind)).toEqual(["replaced"]);
+  });
+
+  // An identical subtree somewhere else is a node going away and another arriving.
+  test("leaves a pair at different paths alone", () => {
+    const elsewhere: TreeChange = { ...added, path: "main > region > paragraph" };
+    expect(mergeReplaced([elsewhere, removed])).toEqual([elsewhere, removed]);
+  });
+
+  // Different content at the same path is a real change, not a copy.
+  test("leaves a pair with different subtrees alone", () => {
+    const edited: TreeChange = { ...added, node: node(`- paragraph [ref=e8]: Saving`) };
+    expect(mergeReplaced([edited, removed])).toEqual([edited, removed]);
+  });
+
+  // A list with nothing to pair comes back as it was.
+  test("returns unpaired changes unchanged", () => {
+    expect(mergeReplaced([added, status])).toEqual([added, status]);
+    expect(mergeReplaced([])).toEqual([]);
   });
 });
 
