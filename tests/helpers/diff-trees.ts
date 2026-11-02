@@ -154,6 +154,52 @@ function visit(
   }
 }
 
+// A node's own text: its direct text children joined with single spaces, with whitespace runs
+// collapsed, so the same message split across different spans reads the same.
+function ownText(node: AriaNode): string {
+  return node.children
+    .filter((c) => c.role === "text")
+    .map((c) => c.value ?? "")
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// A node's states plus a form field's value, which is compared like a state under "value".
+function statesOf(node: AriaNode): Record<string, string | true> {
+  return node.value === undefined ? node.states : { ...node.states, value: node.value };
+}
+
+// The name, state and text changes between two partners, reported at the after node's path.
+function comparePair(b: AriaNode, a: AriaNode, path: string): TreeChange[] {
+  const changes: TreeChange[] = [];
+  // `|| null`: an empty name and no name both mean "no name", and JSON keeps null.
+  const [nameBefore, nameAfter] = [b.name || null, a.name || null];
+  if (nameBefore !== nameAfter) {
+    changes.push({ kind: "nameChanged", path, ref: a.ref, before: nameBefore, after: nameAfter });
+  }
+
+  // Every key on either side; a key on only one side changed from or to null.
+  const [sb, sa] = [statesOf(b), statesOf(a)];
+  const states: Record<string, { before: StateValue; after: StateValue }> = {};
+  for (const key of new Set([...Object.keys(sb), ...Object.keys(sa)])) {
+    if (sb[key] !== sa[key]) states[key] = { before: sb[key] ?? null, after: sa[key] ?? null };
+  }
+  // One stateChanged per node, holding every key that changed.
+  if (Object.keys(states).length) changes.push({ kind: "stateChanged", path, ref: a.ref, changes: states });
+
+  const [textBefore, textAfter] = [ownText(b), ownText(a)];
+  if (textBefore !== textAfter) {
+    changes.push({ kind: "textChanged", path, ref: a.ref, before: textBefore, after: textAfter });
+  }
+  return changes;
+}
+
+// The virtual root as a node, so top-level text is compared like any other node's text.
+function rootOf(nodes: AriaNode[]): AriaNode {
+  return { role: "root", states: {}, children: nodes };
+}
+
 // Options for diffTrees.
 export type DiffOptions = {
   // Lift the children of unnamed generic wrappers into their parents first, so only a
@@ -176,14 +222,17 @@ export function diffTrees(
     after = flattenGeneric(after);
   }
   const matches = matchTrees(before, after);
-  // The after nodes that have a before partner.
-  const matchedAfter = new Set(matches.values());
-  const changes: TreeChange[] = [];
+  // The same pairs looked up from the after side: after node -> before node.
+  const partnerOf = new Map([...matches].map(([b, a]) => [a, b]));
+  // Text directly under the virtual root (top-level text) has the empty path.
+  const changes = comparePair(rootOf(before), rootOf(after), "");
 
-  // A new node whose parent existed before is the root of an added subtree; anything
-  // below it rides along in `node` instead of being reported again.
-  visit(after, (n) => matchedAfter.has(n), (node, path, matched, parentMatched) => {
-    if (!matched && parentMatched) changes.push({ kind: "added", path, ref: node.ref, node });
+  visit(after, (n) => partnerOf.has(n), (node, path, matched, parentMatched) => {
+    // A pair: report what changed on the node itself.
+    if (matched) changes.push(...comparePair(partnerOf.get(node)!, node, path));
+    // A new node whose parent existed before is the root of an added subtree; anything
+    // below it rides along in `node` instead of being reported again.
+    else if (parentMatched) changes.push({ kind: "added", path, ref: node.ref, node });
   });
   // The same rule from the before side: report a removed subtree once, at its root.
   visit(before, (n) => matches.has(n), (node, path, matched, parentMatched) => {
