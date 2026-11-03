@@ -149,11 +149,12 @@ test.describe("classify: focus following the user", () => {
     expect(result.meaningful).toBe(false);
   });
 
-  // The user tabbed to a button, then delayed content moved focus seconds later with no new
-  // action. The old Tab doesn't explain that move.
-  test("a move long after a Tab → meaningful", () => {
+  // #129 gives Tab no time window, so a Tab still counts however long before the move it came.
+  // The cost: if the page moves focus seconds after a Tab with no new action (delayed content),
+  // that move is recorded too, not called page-moved. This test makes that visible in review.
+  test("a move long after a Tab → recorded", () => {
     const later = focus({ lastAction: { kind: "keydown", key: "Tab", msBefore: 3000 } });
-    expect(reasonOf(later)).toBe("focus:page-moved");
+    expect(reasonOf(later)).toBe("focus:followed-tab");
   });
 
   // Clicking a focusable element focuses that element.
