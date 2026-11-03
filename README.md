@@ -76,7 +76,23 @@ Sending feedback changes the button to "Sending…", then shows a confirmation. 
 
 **axe can't detect this flaw** (manifest: `nvdaOnly: true`). The broken page is clean to axe, but a screen reader says nothing, and a keyboard user loses their place. Only checking the live region and `document.activeElement` catches it.
 
+
+## Load more: announcements and focus
+
+The Load More scenario adds 5 articles each time the button is pressed, starting with 5 and ending with 15. The tests check status messages, keyboard focus, and axe-core results.
+
+### What the results show
+
+| Variant | Status messages | Focus | axe |
+|---|---|---|---|
+| accessible | Announces loading and updated article count | Moves to the first new article | 0 violations |
+| broken | No announcements | Stays on the button, then falls back to the page body | 0 violations |
+
+Both tests pass. The broken version has accessibility problems that axe-core cannot detect.
+
+
 ### Files
+- `tests/load-more.spec.ts`: tests status messages and keyboard focus when loading more articles.
 
 - `playwright.config.ts`: points Playwright at Team Y's site (`baseURL`) and defines the `chromium` (automatic) and `manual` projects.
 - `tests/menu.spec.ts`: the menu tests.
