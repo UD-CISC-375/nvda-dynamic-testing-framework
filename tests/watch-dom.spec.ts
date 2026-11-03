@@ -247,3 +247,24 @@ test("an element focused before watchDom started is still caught when removed", 
   const changes = await watcher.waitFor((c) => c.some((x) => x.type === "focusLost"));
   expect(changes.find((x) => x.type === "focusLost")?.oldValue).toBe("button#send");
 });
+
+test("clicking away to plain text, then removing the element, records no focusLost", { tag: "@unit" }, async ({ page }) => {
+  await page.setContent(`<button id="send">Send</button><p id="note">Plain text</p>`);
+  const watcher = await watchDom(page);
+  await page.focus("#send");
+
+  // A real click on text that can't take focus: focus goes to <body>, and no
+  // focusin fires anywhere. The user left the button; the page didn't take it.
+  await page.click("#note");
+  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+
+  // Remove the button, then add a marker. A focusLost would be reported right
+  // after the removal, so once the marker arrives it would already be in the list.
+  await page.evaluate(() => {
+    document.querySelector("#send")!.remove();
+    document.body.append(document.createElement("hr"));
+  });
+
+  const changes = await watcher.waitFor((c) => c.some((x) => x.added.includes("hr")));
+  expect(changes.some((x) => x.type === "focusLost")).toBe(false);
+});

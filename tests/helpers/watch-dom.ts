@@ -37,6 +37,8 @@ export type DomChange = {
  * after the change that removed it, with the removed element as oldValue.
  * No focus event lands anywhere for that, so it would otherwise go unseen.
  * This includes an element that already had focus when watchDom was called.
+ * Focus the user moved away first (e.g. by clicking plain text, which sends
+ * focus to <body>) is not a drop: removing that element later records nothing.
  *
  * Only one watcher per page: a second call on the same page throws, because
  * exposeFunction can only register "__reportDomChange" once.
@@ -194,6 +196,33 @@ export async function watchDom(page: Page, rootSelector = "body") {
         });
         // Set after the flush above, which checks the element focus came from.
         lastFocused = el;
+      },
+      true,
+    );
+
+    // Clicking plain text sends focus to <body> with no focusin, so without
+    // this, lastFocused would still point at the element the user left, and
+    // removing it later would look like a drop. Capture phase, like focusin.
+    document.addEventListener(
+      "focusout",
+      (event) => {
+        const el = event.target as Element;
+        // Chromium also fires focusout when the focused element is removed,
+        // while it's still connected, so it can't tell the two apart yet.
+        // Decide in a microtask: a removal has finished by then, and this
+        // microtask runs before the observer's, which was queued after it.
+        queueMicrotask(() => {
+          // Still on the page, but no longer focused: the user moved focus
+          // away, so there's nothing left to lose. The activeElement check
+          // keeps it when the window loses focus but the element doesn't.
+          if (
+            lastFocused === el &&
+            el.isConnected &&
+            document.activeElement !== el
+          ) {
+            lastFocused = null;
+          }
+        });
       },
       true,
     );
