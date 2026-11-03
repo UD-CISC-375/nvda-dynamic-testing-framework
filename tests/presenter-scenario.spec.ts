@@ -30,11 +30,14 @@ type Scenario = {
 };
 
 // Steps run after the registry's setup: scenarios with no setup get one, so there's something
-// to show, and the menu closes again to show the way back to its first state.
+// to show, and the menu closes and reopens to show the way back to earlier states.
 const EXTRA_STEPS: Record<string, Step[]> = {
   "disclosure-tabs": [{ action: "click", testid: "tab-security" }],
   "forms-labels": [{ action: "fill", testid: "full-name", value: "Ann" }],
-  "disclosure-menu": [{ action: "click", testid: "trigger", label: "click trigger again (close)" }],
+  "disclosure-menu": [
+    { action: "click", testid: "trigger", label: "click trigger again (close)" },
+    { action: "click", testid: "trigger", label: "click trigger again (reopen)" },
+  ],
 };
 
 // The two timeout messages next() throws when nothing more happens.
