@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 // buildTree makes the small subtrees that added, removed and replaced entries carry.
 import { buildTree } from "./helpers/parse-snapshot";
 // Import the classifier under test.
-import { classify } from "./helpers/classify";
+import { classify, FOLLOW_WINDOW_MS } from "./helpers/classify";
 // Types for the hand-built changes and the expected labels.
 import type { FocusChange, Label } from "./helpers/classify";
 import type { TreeChange } from "./helpers/diff-trees";
@@ -128,6 +128,75 @@ test.describe("classify: focus changes", () => {
     const moved = focus();
     const result = classify({ diff: [sample.textChanged], focusChanges: [lost, moved] });
     expect(result.changes.map((c) => c.change)).toEqual([sample.textChanged, lost, moved]);
+  });
+});
+
+test.describe("classify: focus following the user", () => {
+  // The row one focus record gets.
+  const reasonOf = (change: FocusChange) => classify({ diff: [], focusChanges: [change] }).changes[0].reason;
+
+  // Tab moves focus to the next field during the key press itself.
+  test("Tab between form fields → recorded", () => {
+    const tabbed = focus({ target: "input#email", oldValue: "input#name", lastAction: { kind: "keydown", key: "Tab", msBefore: 3 } });
+    const result = classify({ diff: [], focusChanges: [tabbed] });
+    expect(result.changes[0]).toMatchObject({ label: "recorded", reason: "focus:followed-tab" });
+    expect(result.meaningful).toBe(false);
+  });
+
+  // The user tabbed to a button, then delayed content moved focus seconds later with no new
+  // action. The old Tab doesn't explain that move.
+  test("a move long after a Tab → meaningful", () => {
+    const later = focus({ lastAction: { kind: "keydown", key: "Tab", msBefore: 3000 } });
+    expect(reasonOf(later)).toBe("focus:page-moved");
+  });
+
+  // Clicking a focusable element focuses that element.
+  test("click on the focused element → recorded", () => {
+    const clicked = focus({ lastAction: { kind: "pointerdown", msBefore: 2 }, relation: "same" });
+    expect(reasonOf(clicked)).toBe("focus:followed-click");
+  });
+
+  // Clicking the text <span> inside a <button> focuses the button, which contains the target.
+  test("click on a span inside a button → recorded", () => {
+    const clicked = focus({ lastAction: { kind: "pointerdown", msBefore: 2 }, relation: "contains" });
+    expect(reasonOf(clicked)).toBe("focus:followed-click");
+  });
+
+  // Clicking a wrapper can focus an element inside it.
+  test("click that focuses an element inside the target → recorded", () => {
+    const clicked = focus({ lastAction: { kind: "pointerdown", msBefore: 2 }, relation: "inside" });
+    expect(reasonOf(clicked)).toBe("focus:followed-click");
+  });
+
+  // The user clicks Close and the page sends focus back to the button that opened the popup:
+  // not where they clicked, so the page moved it.
+  test("page returns focus to the opening button after a click → meaningful", () => {
+    const returned = focus({
+      target: "button#open",
+      oldValue: "button#close",
+      lastAction: { kind: "pointerdown", msBefore: 4 },
+      relation: "unrelated",
+    });
+    expect(reasonOf(returned)).toBe("focus:page-moved");
+  });
+
+  // Escape closes the popup and the page sends focus back to the opener: not a Tab, so the page moved it.
+  test("page returns focus to the opening button after Escape → meaningful", () => {
+    const returned = focus({ target: "button#open", lastAction: { kind: "keydown", key: "Escape", msBefore: 4 } });
+    expect(reasonOf(returned)).toBe("focus:page-moved");
+  });
+
+  // The window includes its edge: exactly FOLLOW_WINDOW_MS still follows, one ms more doesn't.
+  test("counts a click as followed up to FOLLOW_WINDOW_MS and not after", () => {
+    const at = (msBefore: number) => focus({ lastAction: { kind: "pointerdown", msBefore }, relation: "same" });
+    expect(reasonOf(at(FOLLOW_WINDOW_MS))).toBe("focus:followed-click");
+    expect(reasonOf(at(FOLLOW_WINDOW_MS + 1))).toBe("focus:page-moved");
+  });
+
+  // Clicking non-focusable text drops focus to <body> without a focusin, and #116 doesn't report
+  // it as focusLost. So classify gets no focus record and no tree change: nothing to flag.
+  test("click on a non-focusable div → not meaningful", () => {
+    expect(classify({ diff: [], focusChanges: [] }).meaningful).toBe(false);
   });
 });
 
