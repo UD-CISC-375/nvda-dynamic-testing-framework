@@ -365,3 +365,44 @@ test.describe("createTreeTracker: returning to an earlier state", () => {
     expect(back.focusChanges.map((c) => c.type)).toContain("focusLost");
   });
 });
+
+test.describe("createTreeTracker: the issue's scenarios", () => {
+  // A native checkbox toggles without any DOM mutation (checked is a property, not an
+  // attribute), so watchDom sees nothing but the focus; the tree still shows [checked].
+  test("a checkbox click with no DOM mutation is recorded", async ({ page }) => {
+    await page.setContent(`<input type="checkbox" id="agree"><label for="agree">Agree</label>`);
+    const tracker = await createTreeTracker(page, page.locator("body"));
+    await page.getByRole("checkbox", { name: "Agree" }).click();
+    const entry = await tracker.next();
+    expect(entry).toMatchObject({ stateIndex: 0, newState: false, meaningful: false });
+    expect(entry.diff.map((c) => c.kind)).toEqual(["stateChanged"]);
+    // watchDom saw no DOM change at all, only the click's focus move.
+    expect(tracker.watcher.changes.filter((c) => !isFocusRecord(c))).toEqual([]);
+  });
+
+  // Hovering shows a tooltip through CSS alone: no DOM mutation, but a node appears.
+  test("a CSS-hover tooltip is meaningful", async ({ page }) => {
+    await page.setContent(`
+      <style>.tip { display: none; } #help:hover + .tip { display: block; }</style>
+      <button id="help">Help</button><div role="tooltip" class="tip">Opens the guide</div>`);
+    const tracker = await createTreeTracker(page, page.locator("body"));
+    await page.getByRole("button", { name: "Help" }).hover();
+    const entry = await tracker.next();
+    expect(entry).toMatchObject({ stateIndex: 1, newState: true, meaningful: true });
+    // A tooltip is named by its text, so the path carries the name.
+    expect(entry.diff).toEqual([expect.objectContaining({ kind: "added", path: 'tooltip "Opens the guide"' })]);
+  });
+
+  // The handler moves focus to an unrelated button and changes nothing else: settling ignores
+  // [active], so only the focus records make this an entry, and the page made the move.
+  test("a click handler moving focus elsewhere gives an empty-diff meaningful entry", async ({ page }) => {
+    await page.setContent(
+      `<button id="go" onclick="document.getElementById('other').focus()">Go</button> <button id="other">Other</button>`,
+    );
+    const tracker = await createTreeTracker(page, page.locator("body"));
+    await page.getByRole("button", { name: "Go" }).click();
+    const entry = await tracker.next();
+    expect(entry).toMatchObject({ diff: [], meaningful: true, newState: true });
+    expect(entry.classification.changes.map((c) => c.reason)).toEqual(["focus:followed-click", "focus:page-moved"]);
+  });
+});
