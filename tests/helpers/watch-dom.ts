@@ -2,10 +2,10 @@ import type { Page } from "@playwright/test";
 
 /** One DOM change, copied out of the browser as plain data. */
 export type DomChange = {
-  type: "attributes" | "childList" | "characterData" | "focus";
-  target: string; // e.g. 'button#actions-button' (for text edits: the element holding the text; for focus: the element now focused)
+  type: "attributes" | "childList" | "characterData" | "focus" | "focusLost";
+  target: string; // e.g. 'button#actions-button' (for text edits: the element holding the text; for focus: the element now focused; for focusLost: "body")
   attributeName: string | null; // set when type === "attributes"
-  oldValue: string | null; // attribute value before the change (null = attribute was absent); for focus: the element that had focus (null = none or <body>)
+  oldValue: string | null; // attribute value before the change (null = attribute was absent); for focus: the element that had focus (null = none or <body>); for focusLost: the removed element that had focus
   newValue: string | null; // attribute value now (null = attribute was removed)
   added: string[]; // nodes inserted (childList changes)
   removed: string[]; // nodes removed (childList changes)
@@ -31,6 +31,11 @@ export type DomChange = {
  * recorded too, as type "focus", because they don't mutate the DOM and the
  * observer can't see them. Note that Playwright's .click() focuses what it
  * clicks, so a click usually records a focus change first.
+ *
+ * When the focused element inside the root (or an ancestor of it) is removed
+ * and focus falls back to <body>, a "focusLost" change is recorded right
+ * after the change that removed it, with the removed element as oldValue.
+ * No focus event lands anywhere for that, so it would otherwise go unseen.
  *
  * Only one watcher per page: a second call on the same page throws, because
  * exposeFunction can only register "__reportDomChange" once.
@@ -78,6 +83,10 @@ export async function watchDom(page: Page, rootSelector = "body") {
     const LIVE =
       '[role="status"], [role="alert"], [role="log"], [aria-live]:not([aria-live="off"])';
 
+    // The element inside root that has focus, so we can tell when it's
+    // removed. A live node can't be sent to Node, so it stays in the page.
+    let lastFocused: Element | null = null;
+
     // Send a batch of MutationRecords to Node. Named, not inline, so records
     // pulled out early with observer.takeRecords() are reported the same way.
     const reportMutations = (records: MutationRecord[]) => {
@@ -100,6 +109,34 @@ export async function watchDom(page: Page, rootSelector = "body") {
           text: r.type === "attributes" ? null : (el?.textContent ?? null),
           inLiveRegion: !!el?.closest(LIVE),
         });
+
+        // <body> having focus (or nothing, in a page without one) means
+        // focus fell back to the page itself.
+        const active = document.activeElement;
+        // A drop: this record removed the focused element or an ancestor of
+        // it, it's still off the page, and focus fell back to <body>. Checked
+        // per record, so the drop lands right after the change that caused it.
+        if (
+          lastFocused &&
+          !lastFocused.isConnected &&
+          (!active || active === document.body) &&
+          Array.from(r.removedNodes).some((n) => n.contains(lastFocused))
+        ) {
+          // Same shape as a DOM change, with the DOM-only fields left empty.
+          (window as any).__reportDomChange({
+            type: "focusLost",
+            target: "body",
+            attributeName: null,
+            oldValue: describe(lastFocused),
+            newValue: null,
+            added: [],
+            removed: [],
+            text: null,
+            inLiveRegion: false,
+          });
+          // Report each drop once: later batches have nothing left to lose.
+          lastFocused = null;
+        }
       }
     };
 
@@ -119,9 +156,13 @@ export async function watchDom(page: Page, rootSelector = "body") {
     document.addEventListener(
       "focusin",
       (event) => {
-        const el = event.target as Node;
-        // Only focus landing inside the watched root counts.
-        if (!root.contains(el)) return;
+        const el = event.target as Element;
+        // Only focus landing inside the watched root counts. Focus moving
+        // outside it leaves nothing inside root to lose.
+        if (!root.contains(el)) {
+          lastFocused = null;
+          return;
+        }
         // focusin fires right away, but DOM changes made earlier in this task
         // are still queued for the observer. Report those first, so the list
         // stays in the order things happened. takeRecords() also empties the
@@ -143,6 +184,8 @@ export async function watchDom(page: Page, rootSelector = "body") {
           // Focus is announced by moving focus, not through a live region.
           inLiveRegion: false,
         });
+        // Set after the flush above, which checks the element focus came from.
+        lastFocused = el;
       },
       true,
     );
