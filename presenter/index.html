@@ -130,8 +130,7 @@
     <h3>Focus lines</h3>
     <dl>
       <dt><code>focus</code> / <code>focusLost</code></dt><dd>Focus moved to an element, or the focused element was removed.</dd>
-      <dt><code>(was …)</code></dt><dd>What had focus before.</dd>
-      <dt><code>pointerdown / keydown N ms before</code></dt><dd>The user's last action, and how long before the focus move.</dd>
+      <dt><code>(was …)</code></dt><dd>What had focus before ("none" if nothing did).</dd>
       <dt><code>relation</code></dt><dd>Where focus landed vs. what was clicked: same, inside it, contains it, or unrelated.</dd>
     </dl>
     </div>
@@ -219,10 +218,9 @@
     }
 
     // One focus record (see FocusChange in tests/helpers/classify.ts).
+    // lastAction (pointerdown/keydown and its timing) is left out; it's still in the raw JSON.
     function focusLine(f) {
-      const a = f.lastAction;
-      const action = a ? `${a.kind}${a.key ? ` "${a.key}"` : ""} ${Math.round(a.msBefore)} ms before` : "no user action";
-      return `${f.type}: ${f.target} (was ${f.oldValue ?? "–"}) · ${action} · relation ${f.relation}`;
+      return `${f.type}: ${f.target} (was ${f.oldValue ?? "none"}) · relation ${f.relation}`;
     }
 
     // One entry row: summary line, reason chips, collapsible details.
