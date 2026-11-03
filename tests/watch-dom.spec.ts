@@ -235,3 +235,15 @@ test("removing an element that doesn't have focus records no focusLost", { tag: 
   const changes = await watcher.waitFor((c) => c.some((x) => x.added.includes("hr")));
   expect(changes.some((x) => x.type === "focusLost")).toBe(false);
 });
+
+test("an element focused before watchDom started is still caught when removed", { tag: "@unit" }, async ({ page }) => {
+  await page.setContent(`<button id="send">Send</button>`);
+  // Focus first, so no focusin fires while watching.
+  await page.focus("#send");
+  const watcher = await watchDom(page);
+
+  await page.evaluate(() => document.querySelector("#send")!.remove());
+
+  const changes = await watcher.waitFor((c) => c.some((x) => x.type === "focusLost"));
+  expect(changes.find((x) => x.type === "focusLost")?.oldValue).toBe("button#send");
+});
