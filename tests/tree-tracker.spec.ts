@@ -6,7 +6,8 @@ import { join } from "path";
 // buildTree makes small hand-written trees; parseSnapshot reads the captured pairs.
 import { buildTree, parseSnapshot } from "./helpers/parse-snapshot";
 // Import the tracker helpers under test.
-import { fingerprint, waitForSettled } from "./helpers/tree-tracker";
+import { decideEntry, fingerprint, waitForSettled } from "./helpers/tree-tracker";
+import type { EntryFacts } from "./helpers/tree-tracker";
 // settleKey gives the last entry's key that waitForSettled compares against.
 import { settleKey } from "./helpers/aria-tree";
 import type { TreeSnapshot } from "./helpers/aria-tree";
@@ -120,5 +121,45 @@ test.describe("waitForSettled", () => {
     await expect(waitForSettled(r.read, lastKey, noFocus, { intervalMs: 5, timeoutMs: 50 })).rejects.toThrow(
       "no settled change within 50ms",
     );
+  });
+});
+
+test.describe("decideEntry", () => {
+  // A poll in state 1 of 2 with one tree change, unless a test overrides some fields.
+  const facts = (fields: Partial<EntryFacts> = {}): EntryFacts => ({
+    diffCount: 1,
+    focusCount: 0,
+    meaningful: false,
+    currentState: 1,
+    stateCount: 2,
+    ...fields,
+  });
+
+  // Nothing in the diff and no focus record: no entry at all.
+  test("makes no entry for an empty diff with no focus records", () => {
+    expect(decideEntry(facts({ diffCount: 0 }))).toEqual({ entry: false });
+  });
+
+  // A focus record alone is still an entry (the focus-only AC).
+  test("makes an entry for focus records alone", () => {
+    expect(decideEntry(facts({ diffCount: 0, focusCount: 1 })).entry).toBe(true);
+  });
+
+  // Meaningful starts the next state, even when the tree matches an earlier one (focus lost
+  // on the way back).
+  test("starts a new state for a meaningful entry", () => {
+    const expected = { entry: true, stateIndex: 2, newState: true };
+    expect(decideEntry(facts({ meaningful: true }))).toEqual(expected);
+    expect(decideEntry(facts({ meaningful: true, matchedState: 0 }))).toEqual(expected);
+  });
+
+  // Recorded and back at state 0: attach to state 0.
+  test("attaches a recorded entry to the matched earlier state", () => {
+    expect(decideEntry(facts({ matchedState: 0 }))).toEqual({ entry: true, stateIndex: 0, newState: false });
+  });
+
+  // Recorded with no match: attach to the current state.
+  test("attaches a recorded entry to the current state", () => {
+    expect(decideEntry(facts())).toEqual({ entry: true, stateIndex: 1, newState: false });
   });
 });

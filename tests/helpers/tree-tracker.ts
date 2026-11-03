@@ -91,3 +91,34 @@ export async function waitForSettled(
   // Nothing new settled in time: fail loudly rather than return a half-changed tree.
   throw new Error(`waitForSettled: no settled change within ${timeoutMs}ms`);
 }
+
+// What decideEntry needs to know about one settled poll.
+export type EntryFacts = {
+  // How many tree changes and focus records the poll brought.
+  diffCount: number;
+  focusCount: number;
+  // classify's verdict on them.
+  meaningful: boolean;
+  // The most recent state whose fingerprint the new tree matches, if any.
+  matchedState?: number;
+  // The state the last entry belongs to, and how many states exist so far.
+  currentState: number;
+  stateCount: number;
+};
+
+// Whether a poll makes an entry and, if so, which state it belongs to.
+export type EntryDecision = { entry: false } | { entry: true; stateIndex: number; newState: boolean };
+
+// The one place that decides entries and states (#130), so #139 (CDP-only changes) only edits
+// this function. Nothing is judged here: `meaningful` already comes from classify (#129).
+export function decideEntry(facts: EntryFacts): EntryDecision {
+  // The settle key changed but nothing survived the diff (e.g. only an unnamed wrapper) and
+  // focus didn't move: there's nothing to record, so no entry.
+  if (facts.diffCount === 0 && facts.focusCount === 0) return { entry: false };
+  // Meaningful: a new state, numbered after the last one, and the one that gets scanned.
+  if (facts.meaningful) return { entry: true, stateIndex: facts.stateCount, newState: true };
+  // Recorded, back at an earlier state: log it on that state, which was already scanned.
+  if (facts.matchedState !== undefined) return { entry: true, stateIndex: facts.matchedState, newState: false };
+  // Recorded anywhere else: log it on the current state.
+  return { entry: true, stateIndex: facts.currentState, newState: false };
+}
