@@ -39,7 +39,7 @@ export async function snapshotTree(scope: Locator): Promise<TreeSnapshot> {
 }
 
 // Turn a snapshot into one string that is compared between polls to detect change and settling.
-function settleKey(snap: TreeSnapshot): string {
+export function settleKey(snap: TreeSnapshot): string {
   // Drop markers that change without the content changing: focus moves and pointer cursors.
   const refs = snap.refs.replace(/ \[(active|cursor=pointer)\]/g, "");
   // Join both snapshots so a change in either one counts.
