@@ -74,7 +74,8 @@ export type FocusChange = {
   type: "focus" | "focusLost";
   // Label of the newly focused element ("body" for focusLost).
   target: string;
-  // Label of the element that had focus before, or null if none or <body>.
+  // focus: label of the element that had focus before, or null if none or <body>.
+  // focusLost: label of the removed element that had focus (never null).
   oldValue: string | null;
   // null when there was no user action before it.
   lastAction: LastAction | null;
