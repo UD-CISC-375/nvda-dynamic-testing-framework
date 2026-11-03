@@ -30,6 +30,10 @@ export const RULES = {
   "focus:lost": { label: "meaningful" },
   // Focus moved somewhere the user didn't send it, e.g. into a dialog or back to the opener.
   "focus:page-moved": { label: "meaningful" },
+  // Focus went where the user just sent it: the next field after a Tab, or the thing they
+  // clicked (FOLLOW_WINDOW_MS and FOLLOWS_CLICK below say what counts).
+  "focus:followed-tab": { label: "recorded" },
+  "focus:followed-click": { label: "recorded" },
   // iframe contents → ignored. No row needed: default-mode snapshots don't go into iframes, so
   // those changes never reach classify ("changes inside an iframe produce no TreeChange" in
   // tests/aria-tree.spec.ts fails if that stops being true).
@@ -39,6 +43,16 @@ export const RULES = {
 
 // The key of one table row.
 export type Reason = keyof typeof RULES;
+
+// How soon after a Tab or click a focus move must come to count as the user's. Browsers move
+// focus during the event itself, so real follows take a few ms; a move later than this was made
+// by the page, even if the user's last action was a Tab (delayed content, load more).
+// A starting guess: check it against Team Y's dialog and menu scenarios.
+export const FOLLOW_WINDOW_MS = 100;
+
+// Where focus can land after a click and still be the user's doing: on the clicked element,
+// inside it, or on an element around it (a <span> clicked inside a <button>).
+export const FOLLOWS_CLICK: readonly Relation[] = ["same", "inside", "contains"];
 
 // The user's last pointerdown or keydown before a focus change, as the tracker measured it.
 export type LastAction = {
@@ -120,6 +134,14 @@ export function classify({ diff, focusChanges = [], matchesState = false }: Clas
 function focusReason(change: FocusChange): Reason {
   // Focus dropped to <body> because its element was removed.
   if (change.type === "focusLost") return "focus:lost";
-  // Any other move is one the page made.
+  const action = change.lastAction;
+  // Only a Tab or click right before the move can explain it; an older one says nothing.
+  if (action && action.msBefore <= FOLLOW_WINDOW_MS) {
+    // KeyboardEvent.key is "Tab" for Shift+Tab too, so one check covers both directions.
+    if (action.kind === "keydown" && action.key === "Tab") return "focus:followed-tab";
+    // A click explains the move only if focus landed on, in or around what was clicked.
+    if (action.kind === "pointerdown" && FOLLOWS_CLICK.includes(change.relation)) return "focus:followed-click";
+  }
+  // Nothing the user did explains it, so the page moved focus.
   return "focus:page-moved";
 }
