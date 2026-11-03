@@ -5,7 +5,7 @@ import { buildTree } from "./helpers/parse-snapshot";
 // Import the classifier under test.
 import { classify } from "./helpers/classify";
 // Types for the hand-built changes and the expected labels.
-import type { Label } from "./helpers/classify";
+import type { FocusChange, Label } from "./helpers/classify";
 import type { TreeChange } from "./helpers/diff-trees";
 
 // A paragraph subtree for the entries that carry one.
@@ -27,6 +27,15 @@ const sample: Record<TreeChange["kind"], TreeChange> = {
   nameChanged: { kind: "nameChanged", path: 'button "Pause"', ref: "e2", before: "Play", after: "Pause" },
   reordered: { kind: "reordered", path: "table > rowgroup", ref: "e7", order: [1, 0] },
 };
+
+// A focus record as the tracker will pass it: a page-made move with no user action, unless
+// the test overrides some fields.
+function focus(fields: Partial<FocusChange> = {}): FocusChange {
+  return { type: "focus", target: "button#save", oldValue: null, lastAction: null, relation: "unrelated", ...fields };
+}
+
+// The record #116 adds when the focused element is removed and focus falls to <body>.
+const lost = focus({ type: "focusLost", target: "body", oldValue: "button#close" });
 
 // The definition's rows for tree changes (#124), written out here rather than read from
 // RULES, so a wrong edit to the table fails this test.
@@ -88,6 +97,40 @@ test.describe("classify: returning to an earlier state", () => {
   });
 });
 
+test.describe("classify: focus changes", () => {
+  // The user lost their place, so the entry is meaningful even with no tree change.
+  test("focusLost → meaningful", () => {
+    const result = classify({ diff: [], focusChanges: [lost] });
+    expect(result.changes).toEqual([{ change: lost, label: "meaningful", reason: "focus:lost" }]);
+    expect(result.meaningful).toBe(true);
+  });
+
+  // No user action before it, so the page moved focus on its own.
+  test("focus moved with no user action → meaningful", () => {
+    const moved = focus();
+    expect(classify({ diff: [], focusChanges: [moved] }).changes).toEqual([
+      { change: moved, label: "meaningful", reason: "focus:page-moved" },
+    ]);
+  });
+
+  // matchesState only covers tree changes: the fingerprint holds no focus, so it can't vouch for it.
+  test("judges focus on its own when matchesState is set", () => {
+    const result = classify({ diff: [sample.removed], focusChanges: [lost], matchesState: true });
+    expect(result.changes.map((c) => [c.label, c.reason])).toEqual([
+      ["recorded", "tree:matchesState"],
+      ["meaningful", "focus:lost"],
+    ]);
+    expect(result.meaningful).toBe(true);
+  });
+
+  // Tree changes come first and focus changes after, each group in the order it came in.
+  test("lists tree changes before focus changes", () => {
+    const moved = focus();
+    const result = classify({ diff: [sample.textChanged], focusChanges: [lost, moved] });
+    expect(result.changes.map((c) => c.change)).toEqual([sample.textChanged, lost, moved]);
+  });
+});
+
 test.describe("classify: the entry", () => {
   // One meaningful change makes the whole entry meaningful, whatever else is in it.
   test("is meaningful if any change is", () => {
@@ -109,7 +152,7 @@ test.describe("classify: the entry", () => {
 
   // The result goes into JSON reports (#102), so it must survive a round trip unchanged.
   test("is plain JSON data", () => {
-    const result = classify({ diff: Object.values(sample) });
+    const result = classify({ diff: Object.values(sample), focusChanges: [lost, focus()] });
     expect(JSON.parse(JSON.stringify(result))).toEqual(result);
   });
 });
