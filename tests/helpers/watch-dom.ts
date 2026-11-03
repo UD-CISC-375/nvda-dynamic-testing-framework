@@ -73,7 +73,9 @@ export async function watchDom(page: Page, rootSelector = "body") {
     const LIVE =
       '[role="status"], [role="alert"], [role="log"], [aria-live]:not([aria-live="off"])';
 
-    const observer = new MutationObserver((records) => {
+    // Send a batch of MutationRecords to Node. Named, not inline, so records
+    // pulled out early with observer.takeRecords() are reported the same way.
+    const reportMutations = (records: MutationRecord[]) => {
       for (const r of records) {
         // A text edit targets the text node itself; report its element instead.
         const el =
@@ -94,8 +96,10 @@ export async function watchDom(page: Page, rootSelector = "body") {
           inLiveRegion: !!el?.closest(LIVE),
         });
       }
-    });
+    };
 
+    // The browser calls reportMutations with each batch of changes under root.
+    const observer = new MutationObserver(reportMutations);
     observer.observe(root, {
       subtree: true, // watch every descendant, not just root itself
       attributes: true, // attribute added / changed / removed
