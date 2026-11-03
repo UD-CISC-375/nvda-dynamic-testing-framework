@@ -5,6 +5,7 @@ import type { Result } from "axe-core";
 // Only run the rules that map to WCAG 2.0/2.1/2.2 levels A and AA.
 // A: WCAG minimum baseline
 // AA: WCAG Standard Benchmark
+
 const WCAG_TAGS = [
   "wcag2a",
   "wcag2aa",
@@ -19,8 +20,13 @@ const WCAG_TAGS = [
  * `label` (e.g. "before" / "after") names the report attachment so we can
  * tell scans of the same page apart.
  */
-export async function runAxe(page: Page, testInfo: TestInfo, label: string) {
-  const results = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
+export async function runAxe(
+  page: Page,
+  testInfo: TestInfo,
+  label: string,
+  tags: string[] = WCAG_TAGS,
+) {
+  const results = await new AxeBuilder({ page }).withTags(tags).analyze();
 
   // Short summary in the terminal: one line per broken rule.
   console.log(`[axe ${label}] ${results.violations.length} violation(s)`);

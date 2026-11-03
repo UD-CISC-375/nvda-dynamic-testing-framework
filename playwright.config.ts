@@ -1,21 +1,34 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const isCI = !!process.env.CI;
+const baseURL = process.env.BASE_URL ?? 'https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/';
+
 export default defineConfig({
   testDir: 'tests',
+  retries: isCI ? 2 : 0,
   // Print each test as it runs, and also write an HTML report.
   // Locally the report opens in the browser when the run ends (Ctrl+C in the
   // terminal stops the report server). On CI nobody is there to look or press
   // Ctrl+C, so it stays closed.
-  reporter: [['list'], ['html', { open: process.env.CI ? 'never' : 'always' }]],
+  reporter: [['list'], ['html', { open: isCI ? 'never' : 'always' }]],
   use: {
+    trace: isCI ? 'on-first-retry' : 'off',
     // Team Y's site. Tests call page.goto('#/...') and Playwright prepends this.
     // The trailing slash matters: without it the relative URL would replace
     // "nvda-dynamic-testing-webpage" instead of being appended after it.
-    baseURL: 'https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/',
+    baseURL,
     // Pause this many ms before each browser action so people can watch.
     // Unset (0) normally; the presenter server (presenter/server.mjs) sets it.
     launchOptions: { slowMo: Number(process.env.SLOW_MO) || 0 },
   },
+  webServer: isCI
+    ? {
+        command: 'npx serve site-root -l 4173',
+        url: 'http://127.0.0.1:4173/nvda-dynamic-testing-webpage/',
+        reuseExistingServer: false,
+        timeout: 120_000,
+      }
+    : undefined,
   projects: [
     // Default: Playwright clicks the menu button itself.
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },

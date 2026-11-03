@@ -1,18 +1,66 @@
 // Import only the Locator and TestInfo types from Playwright (no runtime code).
 import type { Locator, TestInfo } from "@playwright/test";
 
-// Capture the accessibility tree under `scope` as a YAML-like string.
-export async function snapshotTree(scope: Locator): Promise<string> {
-  // Ask Playwright for the ARIA snapshot of the scoped element and its descendants.
-  return scope.ariaSnapshot();
-// End of snapshotTree.
+// One poll of the tree: two snapshots of the same moment, each good for different things.
+export type TreeSnapshot = {
+  // Default-mode snapshot: what a screen reader gets (aria-hidden text left out).
+  content: string;
+  // AI-mode snapshot: stable [ref=eN] ids and the [active] focus marker.
+  refs: string;
+  // False if the page kept changing and snapshotTree ran out of retries, so content
+  // and refs may describe slightly different moments.
+  consistent: boolean;
+};
+
+// How many times snapshotTree retries before giving up on a page that keeps changing.
+const MAX_SNAPSHOT_TRIES = 3;
+
+// Capture the accessibility tree under `scope` in both modes, from the same moment.
+// The two snapshots are separate browser calls, so the page can change in between.
+// Taking content again after refs catches that: if both content reads match, the page
+// didn't change (in a way default mode can see) while refs was being taken.
+export async function snapshotTree(scope: Locator): Promise<TreeSnapshot> {
+  // Default mode: accurate content, no refs or focus.
+  let content = await scope.ariaSnapshot();
+  for (let attempt = 1; ; attempt++) {
+    // AI mode: refs and focus, but leaks aria-hidden text, so it isn't used for content.
+    const refs = await scope.ariaSnapshot({ mode: "ai" });
+    // Default mode again, strictly after refs finished.
+    const contentAfter = await scope.ariaSnapshot();
+    // No change around the refs snapshot: the pair goes together.
+    if (contentAfter === content)
+      return { content: contentAfter, refs, consistent: true };
+    // Out of tries: return the latest pair, but say it may not match.
+    if (attempt >= MAX_SNAPSHOT_TRIES)
+      return { content: contentAfter, refs, consistent: false };
+    // The page changed mid-snapshot: start over from the newest content.
+    content = contentAfter;
+  }
 }
 
-// Trim indentation (v1 ignores hierarchy) and drop the trailing ":" that marks children.
+// Turn a snapshot into one string that is compared between polls to detect change and settling.
+export function settleKey(snap: TreeSnapshot): string {
+  // Drop markers that change without the content changing: focus moves and pointer cursors.
+  const refs = snap.refs.replace(/ \[(active|cursor=pointer)\]/g, "");
+  // Join both snapshots so a change in either one counts.
+  return `${snap.content}\n${refs}`;
+}
+
+// Return the ref id (e.g. "e28") of the first refs line that matches `pattern`, or undefined.
+export function refOf(refs: string, pattern: RegExp): string | undefined {
+  // Find the first line that matches the pattern.
+  const line = refs.split("\n").find((l) => pattern.test(l));
+  // Pull the id out of "[ref=e28]" on that line, if both exist.
+  return line?.match(/\[ref=(\w+)\]/)?.[1];
+}
+
+// Trim indentation (ignores hierarchy) and drop the trailing ":" that marks children.
 function toLines(snapshot: string): string[] {
   // Split into lines, strip whitespace and trailing ":", then remove empty lines.
-  return snapshot.split("\n").map((l) => l.trim().replace(/:$/, "")).filter(Boolean);
-// End of toLines.
+  return snapshot
+    .split("\n")
+    .map((l) => l.trim().replace(/:$/, ""))
+    .filter(Boolean);
 }
 
 // Multiset line diff: counts matter, so duplicate lines are compared as separate items.
@@ -25,7 +73,6 @@ export function diffTree(before: string, after: string) {
     for (const l of lines) m.set(l, (m.get(l) ?? 0) + 1);
     // Return the finished line counts.
     return m;
-  // End of count helper.
   };
   // Line counts for the tree before the change.
   const b = count(toLines(before));
@@ -36,12 +83,13 @@ export function diffTree(before: string, after: string) {
   // Lines that appear more times before than after.
   const removed: string[] = [];
   // For each "after" line, push one copy per extra occurrence beyond the "before" count.
-  for (const [line, n] of a) for (let i = b.get(line) ?? 0; i < n; i++) added.push(line);
+  for (const [line, n] of a)
+    for (let i = b.get(line) ?? 0; i < n; i++) added.push(line);
   // For each "before" line, push one copy per occurrence missing from the "after" count.
-  for (const [line, n] of b) for (let i = a.get(line) ?? 0; i < n; i++) removed.push(line);
+  for (const [line, n] of b)
+    for (let i = a.get(line) ?? 0; i < n; i++) removed.push(line);
   // Return both lists together.
   return { added, removed };
-// End of diffTree.
 }
 
 // Poll until the tree differs from `before` AND is identical on `stableReads` consecutive polls.
@@ -49,59 +97,85 @@ export async function waitForTreeChange(
   // The element whose accessibility tree is polled.
   scope: Locator,
   // The snapshot taken before the action; we wait for something different.
-  before: string,
+  before: TreeSnapshot,
   // Options: total timeout, delay between polls, and how many matching reads count as settled.
   { timeoutMs = 5000, intervalMs = 100, stableReads = 3 } = {},
-// The function resolves with the settled "after" snapshot.
-): Promise<string> {
+  // The function resolves with the settled "after" snapshot.
+): Promise<TreeSnapshot> {
   // Absolute time after which we give up.
   const deadline = Date.now() + timeoutMs;
-  // The most recent snapshot seen, starting with the "before" one.
-  let last = before;
+  // The comparison key for the "before" snapshot, computed once.
+  const beforeKey = settleKey(before);
+  // The key of the most recent snapshot seen, starting with the "before" one.
+  let lastKey = beforeKey;
   // How many consecutive polls matched the previous (changed) snapshot.
   let sameCount = 0;
   // Keep polling until the deadline passes.
   while (Date.now() < deadline) {
     // Sleep for one polling interval.
     await new Promise((r) => setTimeout(r, intervalMs));
-    // Take a fresh snapshot of the tree.
-    const now = await scope.ariaSnapshot();
+    // Take a fresh snapshot of the tree (both modes).
+    const now = await snapshotTree(scope);
+    // Reduce it to the key we compare on.
+    const nowKey = settleKey(now);
     // Tree hasn't changed from the original yet, so reset the stability counter.
-    if (now === before) sameCount = 0;
+    if (nowKey === beforeKey) sameCount = 0;
     // Tree has changed and matches the last poll, so it may be settling.
-    else if (now === last) {
+    else if (nowKey === lastKey) {
       // Count one more consecutive identical read.
       sameCount++;
       // Enough identical reads in a row (the first read plus the repeats): return it.
       if (sameCount >= stableReads - 1) return now;
-    // Tree changed again since the last poll, so it's still moving; restart the count.
+      // Tree changed again since the last poll, so it's still moving; restart the count.
     } else sameCount = 0;
-    // Remember this snapshot for the next comparison.
-    last = now;
-  // End of polling loop.
+    // Remember this snapshot's key for the next comparison.
+    lastKey = nowKey;
+    // End of polling loop.
   }
   // The tree never changed and settled in time, so fail loudly.
-  throw new Error(`waitForTreeChange: tree did not change and settle within ${timeoutMs}ms`);
-// End of waitForTreeChange.
+  throw new Error(
+    `waitForTreeChange: tree did not change and settle within ${timeoutMs}ms`,
+  );
+  // End of waitForTreeChange.
 }
 
 // Attach the before/after snapshots and the diff to the Playwright test report.
 export async function attachTreeDiff(
   // Test metadata (used to attach files) and a label used in the attachment names.
-  testInfo: TestInfo, label: string, before: string, after: string,
+  testInfo: TestInfo,
+  label: string,
+  before: TreeSnapshot,
+  after: TreeSnapshot,
   // The diff object, typed as whatever diffTree returns.
   diff: ReturnType<typeof diffTree>,
-// This function returns nothing; it only writes attachments.
+  // This function returns nothing; it only writes attachments.
 ) {
-  // Attach the "before" tree as plain text.
-  await testInfo.attach(`tree-${label}-before.yaml`, { body: before, contentType: "text/plain" });
-  // Attach the "after" tree as plain text.
-  await testInfo.attach(`tree-${label}-after.yaml`, { body: after, contentType: "text/plain" });
+  // Attach the "before" content tree as plain text.
+  await testInfo.attach(`tree-${label}-before.yaml`, {
+    body: before.content,
+    contentType: "text/plain",
+  });
+  // Attach the "after" content tree as plain text.
+  await testInfo.attach(`tree-${label}-after.yaml`, {
+    body: after.content,
+    contentType: "text/plain",
+  });
+  // Attach the "before" refs tree (AI mode: ref ids and focus) as plain text.
+  await testInfo.attach(`tree-${label}-before-refs-ai-mode.yaml`, {
+    body: before.refs,
+    contentType: "text/plain",
+  });
+  // Attach the "after" refs tree (AI mode) as plain text.
+  await testInfo.attach(`tree-${label}-after-refs-ai-mode.yaml`, {
+    body: after.refs,
+    contentType: "text/plain",
+  });
   // Attach the diff as pretty-printed JSON.
   await testInfo.attach(`tree-${label}-diff.json`, {
     // Serialize the diff with 2-space indentation and mark it as JSON.
-    body: JSON.stringify(diff, null, 2), contentType: "application/json",
-  // End of the attachment options.
+    body: JSON.stringify(diff, null, 2),
+    contentType: "application/json",
+    // End of the attachment options.
   });
-// End of attachTreeDiff.
+  // End of attachTreeDiff.
 }
