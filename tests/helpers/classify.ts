@@ -23,6 +23,9 @@ export const RULES = {
   "tree:stateChanged": { label: "recorded" },
   "tree:nameChanged": { label: "recorded" },
   "tree:reordered": { label: "recorded" },
+  // Returning to an earlier state: the page is somewhere already scanned, so every tree change
+  // is only logged, whatever its kind. Focus changes are still judged on their own.
+  "tree:matchesState": { label: "recorded" },
   // iframe contents → ignored. No row needed: default-mode snapshots don't go into iframes, so
   // those changes never reach classify ("changes inside an iframe produce no TreeChange" in
   // tests/aria-tree.spec.ts fails if that stops being true).
@@ -53,6 +56,8 @@ export type Classification = {
 export type ClassifyInput = {
   // Tree changes from diffTrees (#127, #128).
   diff: TreeChange[];
+  // Set when the new tree's fingerprint matches an earlier state's.
+  matchesState?: boolean;
 };
 
 // Attach a table row's label (and provisional flag, if it has one) to a change.
@@ -68,8 +73,8 @@ function labelled(change: TreeChange, reason: Reason): ClassifiedChange {
 // Label every change in one entry with the definition's table. A pure function: an empty
 // input just gives meaningful: false. Whether an empty diff makes a new state is the
 // tracker's call (#130), not this one's.
-export function classify({ diff }: ClassifyInput): Classification {
-  // Each tree change's row is named after its kind.
-  const changes = diff.map((c) => labelled(c, `tree:${c.kind}`));
+export function classify({ diff, matchesState = false }: ClassifyInput): Classification {
+  // Back at an earlier state, one row covers every tree change; otherwise the row is the kind's.
+  const changes = diff.map((c) => labelled(c, matchesState ? "tree:matchesState" : `tree:${c.kind}`));
   return { meaningful: changes.some((c) => c.label === "meaningful"), changes };
 }

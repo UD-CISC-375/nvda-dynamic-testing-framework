@@ -66,6 +66,28 @@ test.describe("classify: tree changes by kind", () => {
   });
 });
 
+test.describe("classify: returning to an earlier state", () => {
+  // Back at an earlier state, even changes that are meaningful elsewhere are only logged.
+  test("records every tree change when matchesState is set", () => {
+    const result = classify({ diff: Object.values(sample), matchesState: true });
+    expect(result.meaningful).toBe(false);
+    // Every kind gets the same row, so the report says why an `added` wasn't meaningful.
+    for (const c of result.changes) expect(c).toMatchObject({ label: "recorded", reason: "tree:matchesState" });
+  });
+
+  // The matchesState row is decided, so a replaced entry loses its provisional flag there.
+  test("does not mark replaced as provisional when matchesState is set", () => {
+    const [c] = classify({ diff: [sample.replaced], matchesState: true }).changes;
+    expect(c).not.toHaveProperty("provisional");
+  });
+
+  // matchesState: false is the same as leaving it out: each kind gets its own row.
+  test("uses the kind's row when matchesState is false", () => {
+    const [c] = classify({ diff: [sample.added], matchesState: false }).changes;
+    expect(c).toMatchObject({ label: "meaningful", reason: "tree:added" });
+  });
+});
+
 test.describe("classify: the entry", () => {
   // One meaningful change makes the whole entry meaningful, whatever else is in it.
   test("is meaningful if any change is", () => {
