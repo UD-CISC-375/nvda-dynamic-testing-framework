@@ -1,0 +1,75 @@
+// Import only the TreeChange type (the diff entries that classify labels).
+import type { TreeChange } from "./diff-trees";
+
+// What the definition (#124) says to do with a change. Meaningful: a new state, scanned by axe.
+// Recorded: logged on the current state, with no new state and no scan. Ignored: dropped.
+export type Label = "meaningful" | "recorded" | "ignored";
+
+// One row of the mapping table: the label, and whether the team's decision is still pending.
+type Rule = { label: Label; provisional?: true };
+
+// The mapping table: the meaningful-change definition as data. Each key is the reason a change
+// gets its label, and is copied onto the change so reports and failing tests say which row
+// applied. If the team changes a decision, edit this table and its test; nothing else.
+export const RULES = {
+  // A node appearing, disappearing or changing parent is a new state.
+  "tree:added": { label: "meaningful" },
+  "tree:removed": { label: "meaningful" },
+  "tree:moved": { label: "meaningful" },
+  // An identical copy swapped in (#128). Deferred; the team is leaning meaningful.
+  "tree:replaced": { label: "meaningful", provisional: true },
+  // Changes inside a node that stays put are logged on the current state.
+  "tree:textChanged": { label: "recorded" },
+  "tree:stateChanged": { label: "recorded" },
+  "tree:nameChanged": { label: "recorded" },
+  "tree:reordered": { label: "recorded" },
+  // iframe contents → ignored. No row needed: default-mode snapshots don't go into iframes, so
+  // those changes never reach classify ("changes inside an iframe produce no TreeChange" in
+  // tests/aria-tree.spec.ts fails if that stops being true).
+  // The first Record makes TypeScript demand a row for every TreeChange kind; the second
+  // lets rows that aren't tree kinds sit in the same table.
+} as const satisfies Record<`tree:${TreeChange["kind"]}`, Rule> & Record<string, Rule>;
+
+// The key of one table row.
+export type Reason = keyof typeof RULES;
+
+// One change with the label its row gave it.
+export type ClassifiedChange = {
+  change: TreeChange;
+  label: Label;
+  reason: Reason;
+  // Only on rows whose decision is still pending.
+  provisional?: true;
+};
+
+// Everything classify decides about one entry. Plain data, so it can go into JSON reports (#102).
+export type Classification = {
+  // An entry is meaningful if any of its changes are.
+  meaningful: boolean;
+  changes: ClassifiedChange[];
+};
+
+// What the tracker (#130) passes in for one entry.
+export type ClassifyInput = {
+  // Tree changes from diffTrees (#127, #128).
+  diff: TreeChange[];
+};
+
+// Attach a table row's label (and provisional flag, if it has one) to a change.
+function labelled(change: TreeChange, reason: Reason): ClassifiedChange {
+  // Widen to Rule so `provisional` can be read on every row, not only the ones that have it.
+  const rule: Rule = RULES[reason];
+  // Leave the key out entirely on decided rows, so reports only show it where it matters.
+  return rule.provisional
+    ? { change, label: rule.label, reason, provisional: true }
+    : { change, label: rule.label, reason };
+}
+
+// Label every change in one entry with the definition's table. A pure function: an empty
+// input just gives meaningful: false. Whether an empty diff makes a new state is the
+// tracker's call (#130), not this one's.
+export function classify({ diff }: ClassifyInput): Classification {
+  // Each tree change's row is named after its kind.
+  const changes = diff.map((c) => labelled(c, `tree:${c.kind}`));
+  return { meaningful: changes.some((c) => c.label === "meaningful"), changes };
+}
