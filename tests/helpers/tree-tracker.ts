@@ -136,6 +136,10 @@ export function decideEntry(facts: EntryFacts): EntryDecision {
 // tracker wraps it, so this name must stay in step with watchDom's.
 const REPORTER = "__reportDomChange";
 
+// Set on window by the tracker's page script. A reload or new document clears it (and the
+// listeners with it); history.pushState keeps it, along with everything else in the page.
+const MARKER = "__treeTrackerInstalled";
+
 // The facts the page measures for one focus or focusLost record, carried on the record itself.
 type FocusFacts = { lastAction: LastAction | null; relation: Relation };
 
@@ -154,9 +158,11 @@ export function isFocusRecord(change: DomChange): boolean {
 // focus: a later focus move can't be measured by mistake. Adds no focusin listener and
 // doesn't touch the DOM, so watchDom records nothing extra.
 export async function installFocusFacts(page: Page): Promise<void> {
-  await page.evaluate((reporter) => {
+  await page.evaluate(({ reporter, marker }) => {
     // The reporter is a property watchDom's exposeFunction put on window.
     const w = window as any;
+    // Mark this document, so the tracker can tell when it's been replaced.
+    w[marker] = true;
     // The last pointerdown or keydown. Kept in the page: its target is a live element.
     let last: { kind: "pointerdown" | "keydown"; key?: string; target: Element | null; timeStamp: number } | null = null;
     // Capture phase on window, so a page calling stopPropagation() can't hide an action.
@@ -202,7 +208,19 @@ export async function installFocusFacts(page: Page): Promise<void> {
       // Hand the record on to watchDom's Node side, facts included.
       return report(change);
     };
-  }, REPORTER);
+  }, { reporter: REPORTER, marker: MARKER });
+}
+
+// Throw if the page is no longer the document the tracker started on. Refs only last one page
+// load, so diffing across loads would pair unrelated nodes, and the listeners are gone too.
+// Doesn't re-baseline: the caller decides what a navigation means. pushState isn't caught on
+// purpose: SPA navigation is an open row in the definition.
+export async function assertSameDocument(page: Page): Promise<void> {
+  // An evaluate during a navigation can fail outright; that's a new document too.
+  const marked = await page.evaluate((marker) => (window as any)[marker] === true, MARKER).catch(() => false);
+  if (!marked) {
+    throw new Error("tree tracker: the page loaded a new document (reload or navigation); create a new tracker");
+  }
 }
 
 // Turn one watchDom focus record into classify's FocusChange. The only place that builds one.
@@ -256,8 +274,12 @@ export async function createTreeTracker(page: Page, scope: Locator, options: Set
   // watchDom first, so the fact wrapper has a reporter to wrap.
   const watcher = await watchDom(page, "body");
   await installFocusFacts(page);
-  // Both snapshots of one moment, as every poll takes them.
-  const read = () => snapshotTree(scope);
+  // Both snapshots of one moment, as every poll takes them, after checking it's still the
+  // same document (so a reload fails on the next poll, not with a nonsense diff).
+  const read = async () => {
+    await assertSameDocument(page);
+    return snapshotTree(scope);
+  };
   // watchDom's focus records so far, in order.
   const focusRecords = () => watcher.changes.filter(isFocusRecord) as TrackedChange[];
 

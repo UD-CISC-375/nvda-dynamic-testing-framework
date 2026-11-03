@@ -460,3 +460,24 @@ test.describe("createTreeTracker on Team Y's pages", () => {
     });
   }
 });
+
+test.describe("createTreeTracker: navigation", () => {
+  // A reload gives new refs and drops the listeners: fail loudly instead of diffing.
+  test("next() throws after a reload", async ({ page }) => {
+    await page.setContent(`<button>Save</button>`);
+    const tracker = await createTreeTracker(page, page.locator("body"));
+    await page.reload();
+    await expect(tracker.next({ timeoutMs: 1000 })).rejects.toThrow("new document");
+  });
+
+  // pushState keeps the document (and the listeners), so the tracker carries on.
+  test("next() keeps working after history.pushState", async ({ page }) => {
+    await page.setContent(
+      `<button aria-pressed="false" onclick="history.pushState(null, '', '#/next'); this.setAttribute('aria-pressed', 'true')">Save</button>`,
+    );
+    const tracker = await createTreeTracker(page, page.locator("body"));
+    await page.getByRole("button", { name: "Save" }).click();
+    // A state change, not a name change: a new name gives the element a new ref (Playwright).
+    expect((await tracker.next()).diff.map((c) => c.kind)).toEqual(["stateChanged"]);
+  });
+});
