@@ -87,6 +87,9 @@ Sending feedback changes the button to "Sending…", then shows a confirmation. 
 - `tests/helpers/watch-dom.ts`: `watchDom()`, a MutationObserver in the page that reports each change back to the test, and `waitFor()`, which waits until the change we expect has been recorded (or fails after a timeout, listing everything it saw).
   - `watchDom(page)` watches the whole `<body>`, for pages whose structure you don't know in advance. `watchDom(page, selector)` only watches inside that element. The scenario specs all pass a selector.
   - Each change names the element it happened on: `tag#id` if the element has an id, otherwise `tag[data-testid="x"]` if it has a testid, otherwise just `tag`.
+  - Focus moves are recorded in the same list, because moving focus changes no DOM and the observer can't see it. When focus lands on an element inside the watched root (by script or by keyboard), a change with `type: "focus"` is added: `target` is the newly focused element, `oldValue` is the element that had focus before (`null` if none or `<body>`), and `attributeName`, `text`, `added` and `removed` are empty. Changes stay in the order they happened, so a focus move made right after a DOM change comes after it in the list.
+  - Playwright's `.click()` focuses the element it clicks, so a click usually records a focus change before the DOM changes it causes.
+  - Not recorded: focus moving outside the watched root, focus dropped to `<body>` when the focused element is removed (no focus event fires for that), and focus inside iframes or shadow DOM.
   - One watcher per page: calling `watchDom` twice on the same page throws.
 - `tests/watch-dom.spec.ts`: unit tests for `watchDom()`, tagged `@unit`. They build their own pages with `page.setContent`, so they don't need Team Y's site. Run them alone with `npx playwright test --grep @unit --project=chromium`.
 
