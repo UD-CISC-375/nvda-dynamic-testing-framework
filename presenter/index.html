@@ -11,13 +11,30 @@
     .group { margin: 0.5rem 0; }
     .group h3 { display: inline-block; width: 7rem; margin: 0; text-transform: capitalize; }
     #status { font-weight: bold; min-height: 1.5em; }
-    /* Two columns: accessible | broken. */
-    .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
-    .column { border: 2px solid #ccc; border-radius: 6px; padding: 0.75rem; min-width: 0; }
-    .column > h2 { margin-top: 0; }
+    /* "Show details" off: only .simple-only parts show; on: only .detail-only parts. */
+    body:not(.details) .detail-only, body.details .simple-only { display: none !important; }
+    .toggle { font-size: 1.1rem; font-weight: 600; }
     .meta { margin: 0.25rem 0; }
-    .step { margin-top: 1rem; }
-    .step > h3 { margin: 0 0 0.25rem; font-size: 1.1rem; border-bottom: 1px solid #ccc; }
+    .scenario-head h2 { margin: 0.5rem 0 0.3rem; font-size: 1.6rem; }
+    .flaw { margin: 0.2rem 0; font-size: 1.2rem; }
+    /* Two columns: accessible | broken, with each step's row lined up across both. */
+    .run-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 1.5rem; margin-top: 0.75rem; }
+    .step-row { display: contents; }
+    .col-head { border-bottom: 3px solid #111; }
+    .col-head h2 { margin: 0.3rem 0; }
+    .step-title { grid-column: 1 / -1; margin: 1.2rem 0 0.3rem; font-size: 1.25rem; border-bottom: 1px solid #ccc; }
+    .cell { min-width: 0; }
+    /* Simple view: one card per entry, a plain-English line per change. */
+    .simple { border-left: 6px solid #999; padding: 0.4rem 0.6rem; margin: 0.4rem 0; background: #f6f6f6; font-size: 1.25rem; }
+    .simple.meaningful { border-color: #b35c00; }
+    .simple.recorded { border-color: #2457a6; }
+    .simple ul { margin: 0.3rem 0 0; padding-left: 1.3rem; }
+    .simple li { margin: 0.15rem 0; }
+    /* A change only this variant has, and one only the other variant has. */
+    .only { background: #fff3a6; font-weight: 600; }
+    .missing { color: #b00020; border: 2px dashed #b00020; border-radius: 4px; padding: 0.3rem 0.6rem; margin: 0.4rem 0; font-size: 1.25rem; font-weight: 600; }
+    .badge.axe-ok { background: #d8f3dc; color: #1a5e2a; }
+    .badge.axe-bad { background: #ffd6d6; color: #8a0010; }
     .none { color: #666; font-style: italic; }
     .entry { border-left: 6px solid #999; padding: 0.4rem 0.6rem; margin: 0.4rem 0; background: #f6f6f6; }
     .entry.meaningful { border-color: #b35c00; }
@@ -51,6 +68,8 @@
     #key dt { margin-top: 0.35rem; }
     #key dd { margin: 0.1rem 0 0 0.75rem; color: #333; }
     #key code { font-size: 0.9rem; }
+    /* The key's samples sit on one line at the key's own size. */
+    #key .missing { display: inline-block; margin: 0; padding: 0 0.4rem; font-size: 0.95rem; }
   </style>
 </head>
 <body>
@@ -59,6 +78,7 @@
     <h1>Accessibility tree tracker (X2.6)</h1>
     <!-- Filled from GET /scenarios, one row per category. -->
     <section id="scenarios" aria-label="Scenarios"><p class="none">Loading scenarios…</p></section>
+    <label class="toggle"><input type="checkbox" id="details-toggle"> Show details</label>
     <p id="status" role="status"></p>
     <div id="results"></div>
 
@@ -71,6 +91,18 @@
   <!-- Always-visible key. The reason wording matches RULES in tests/helpers/classify.ts. -->
   <aside id="key" aria-label="Key">
     <h2>Key</h2>
+    <div class="simple-only">
+      <dl>
+        <dt><span class="badge meaningful">New state</span></dt><dd>Something appeared or disappeared, or the page moved focus. axe scans it.</dd>
+        <dt><span class="badge recorded">Recorded</span></dt><dd>A smaller change: text, a value, a state like expanded, or focus following the click. Logged, no new scan.</dd>
+        <dt><span class="badge baseline">Start</span></dt><dd>The page as first loaded.</dd>
+        <dt><span class="only">Highlighted line</span></dt><dd>Only this version did it.</dd>
+        <dt><span class="missing">Missing: …</span></dt><dd>The other version did this and this one didn't: what a screen-reader user would miss.</dd>
+        <dt><span class="badge axe-ok">axe: 0</span> <span class="badge axe-bad">axe: 1</span></dt><dd>Problems axe found in that state.</dd>
+      </dl>
+      <p class="none">Turn on "Show details" for the tracker's full data.</p>
+    </div>
+    <div class="detail-only">
     <h3>Entry row</h3>
     <dl>
       <dt><strong>e#</strong></dt><dd>Entry number: one per settled change, in order.</dd>
@@ -102,6 +134,7 @@
       <dt><code>pointerdown / keydown N ms before</code></dt><dd>The user's last action, and how long before the focus move.</dd>
       <dt><code>relation</code></dt><dd>Where focus landed vs. what was clicked: same, inside it, contains it, or unrelated.</dd>
     </dl>
+    </div>
   </aside>
   </div>
   <script>
@@ -213,28 +246,155 @@
       return row;
     }
 
-    // One variant's column.
-    function column(variant, r) {
-      const col = el("div", { className: "column" });
-      if (!r) {
-        col.append(el("h2", {}, variant), el("p", { className: "failed" }, "No result (the test didn't run or attach)."));
-        return col;
+    // ---- Simple view: plain-English lines, with accessible and broken compared. ----
+
+    // The last part of a path, e.g. `button "Actions"`, without the [n] sibling index; "page"
+    // for a top-level node.
+    const nodeOf = (path) => (path.split(" > ").at(-1) || "page").replace(/\[\d+\]$/, "");
+    // Shorten long text so it fits on one line.
+    const clip = (s, n = 60) => (typeof s === "string" && s.length > n ? `${s.slice(0, n - 1)}…` : s);
+
+    // One classified change in plain words, as [{ sig, text }]. sig is what's compared between
+    // accessible and broken: the reason (plus the state key), never names or refs, which differ
+    // between the two variants even when they did the same thing.
+    function describe({ change: c, reason, provisional }) {
+      if (reason.startsWith("focus:")) {
+        const text = {
+          "focus:followed-click": "Focus followed the click",
+          "focus:followed-tab": "Focus followed the Tab key",
+          "focus:page-moved": `Page moved focus to ${c.target}`,
+          "focus:lost": "Focus was lost (the focused element was removed)",
+        }[reason] ?? reason;
+        return [{ sig: reason, text }];
       }
-      const s = r.scenario ?? {};
-      // filter(Boolean) drops the parts that are left out (no error, no scenario).
-      col.append(...[
-        el("h2", { className: r.status }, `${r.status === "passed" ? "✓" : "✗"} ${variant} (${r.status})`),
-        r.error && el("p", { className: "failed" }, r.error),
-        s.brokenRules && el("p", { className: "meta" }, `axe brokenRules: ${s.brokenRules.length ? s.brokenRules.join(", ") : "(none)"}`),
-        s.nvdaOnly !== undefined && el("p", { className: "meta" }, `nvdaOnly: ${s.nvdaOnly}`),
-      ].filter(Boolean));
-      for (const step of r.steps ?? []) {
-        col.append(el("div", { className: "step" },
-          el("h3", {}, step.label),
-          step.entries.length ? el("div", {}, ...step.entries.map(entryRow)) : el("p", { className: "none" }, "no entries")));
+      const node = nodeOf(c.path);
+      // Back at an earlier state: same change, but say so and compare it separately.
+      const back = reason === "tree:matchesState" ? " (back to an earlier state)" : "";
+      const sig = reason === "tree:matchesState" ? `${reason}:${c.kind}` : reason;
+      const q = provisional ? " (?)" : "";
+      switch (c.kind) {
+        case "added": return [{ sig, text: `${node} appeared${q}${back}` }];
+        case "removed": return [{ sig, text: `${node} disappeared${q}${back}` }];
+        case "moved": return [{ sig, text: `${node} moved to a new place${q}${back}` }];
+        case "replaced": return [{ sig, text: `${node} was swapped for an identical copy${q}${back}` }];
+        case "textChanged": return [{ sig, text: `Text changed: ${show(clip(c.after))}${back}` }];
+        case "nameChanged": return [{ sig, text: `${node} renamed to ${show(c.after)}${back}` }];
+        case "reordered": return [{ sig, text: `${node}: items reordered${back}` }];
+        case "stateChanged":
+          // One line per state, so "expanded" and "invalid" are compared separately.
+          return Object.entries(c.changes).map(([key, v]) => ({
+            sig: `${sig}:${key}`,
+            text: (key === "value" ? `${node} value is now ${show(clip(v.after))}`
+              : v.after === null ? `${node} is no longer ${key}`
+              : v.after === true ? `${node} is now ${key}`
+              : `${node} ${key} is now ${show(v.after)}`) + back,
+          }));
+        default:
+          return [{ sig, text: `${reason} ${JSON.stringify(c)}` }];
       }
-      return col;
     }
+
+    // Every change in one step, by sig, with the first text seen for each.
+    function stepSigs(step) {
+      const sigs = new Map();
+      for (const e of step?.entries ?? []) {
+        for (const d of e.classification.changes.flatMap(describe)) if (!sigs.has(d.sig)) sigs.set(d.sig, d.text);
+      }
+      return sigs;
+    }
+
+    // "axe: 0" in green, or "axe: 2 (rule, rule)" in red, with the help text on hover.
+    function axeBadge(axe) {
+      const ok = axe.length === 0;
+      return el("span", { className: `badge ${ok ? "axe-ok" : "axe-bad"}`, title: axe.map((v) => `${v.id}: ${v.help}`).join("\n") },
+        ok ? "axe: 0" : `axe: ${axe.length} (${axe.map((v) => v.id).join(", ")})`);
+    }
+
+    // One entry as a card. Lines whose sig the other variant doesn't have are highlighted;
+    // `other` is undefined when there's no other variant to compare with.
+    function simpleEntry(e, other) {
+      const kind = e.index === 0 ? "baseline" : e.meaningful ? "meaningful" : "recorded";
+      const items = e.classification.changes.flatMap(describe);
+      return el("div", { className: `simple ${kind}` },
+        el("span", { className: `badge ${kind}` }, { baseline: "Start", meaningful: "New state", recorded: "Recorded" }[kind]),
+        e.axe && " ",
+        e.axe && axeBadge(e.axe),
+        items.length
+          ? el("ul", {}, ...items.map(({ sig, text }) => el("li", { className: other && !other.has(sig) ? "only" : "" }, text)))
+          : el("p", { className: "meta" }, e.index === 0 ? "Page loaded" : "(no changes)"));
+    }
+
+    // One variant's side of a step: simple cards plus what it's missing, and the detail rows.
+    function cell(step, mine, other) {
+      const entries = step?.entries ?? [];
+      // What the other variant did in this step and this one didn't.
+      const missing = other ? [...other].filter(([sig]) => !mine.has(sig)).map(([, text]) => el("div", { className: "missing" }, `Missing: ${text}`)) : [];
+      return el("div", { className: "cell" },
+        el("div", { className: "simple-only" },
+          ...entries.map((e) => simpleEntry(e, other)),
+          ...missing,
+          !entries.length && !missing.length && el("p", { className: "none" }, "Nothing changed")),
+        el("div", { className: "detail-only" },
+          entries.length ? el("div", {}, ...entries.map(entryRow)) : el("p", { className: "none" }, "no entries")));
+    }
+
+    // A step's label in plain words.
+    const stepName = (label) =>
+      ({ baseline: "Page loads", "no action": "Wait, no action" })[label] ??
+      label.replace(/^fill /, "Type into ").replace(/^press /, "Press a key in ").replace(/^click /, "Click ");
+
+    // One column's header: variant, pass/fail, and any error.
+    function colHead(variant, t) {
+      return el("div", { className: "col-head" },
+        el("h2", { className: t?.status ?? "failed" }, `${variant === "accessible" ? "Accessible" : "Broken"} ${t?.status === "passed" ? "✓" : "✗"}`),
+        !t && el("p", { className: "failed" }, "No result (the test didn't run or attach)."),
+        t?.error && el("p", { className: "failed" }, t.error));
+    }
+
+    // The whole run: scenario summary, then each step lined up across both variants.
+    function renderRun(r) {
+      const a = r.accessible;
+      const b = r.broken;
+      const s = a?.scenario ?? b?.scenario ?? {};
+      const head = el("div", { className: "scenario-head" },
+        el("h2", {}, s.title ?? "(unknown scenario)"),
+        s.flaw && el("p", { className: "flaw" }, `Broken version: ${s.flaw}`),
+        s.brokenRules && el("p", { className: "flaw" },
+          s.nvdaOnly ? "axe can't see this flaw; only a screen reader would." : `axe should flag: ${s.brokenRules.join(", ")}`),
+        el("p", { className: "meta detail-only" }, `brokenRules: [${(s.brokenRules ?? []).join(", ")}] · nvdaOnly: ${s.nvdaOnly}`));
+      const grid = el("div", { className: "run-grid" }, colHead("accessible", a), colHead("broken", b));
+      // Both variants run the same steps, so step i lines up; a failed run may have fewer.
+      const n = Math.max(a?.steps?.length ?? 0, b?.steps?.length ?? 0);
+      for (let i = 0; i < n; i++) {
+        const sa = a?.steps?.[i];
+        const sb = b?.steps?.[i];
+        const ma = stepSigs(sa);
+        const mb = stepSigs(sb);
+        // A step where neither variant did anything only shows in the details view.
+        const empty = !(sa?.entries.length || sb?.entries.length);
+        grid.append(el("div", { className: `step-row${empty ? " detail-only" : ""}` },
+          el("h3", { className: "step-title" }, stepName((sa ?? sb).label)),
+          cell(sa, ma, b && mb),
+          cell(sb, mb, a && ma)));
+      }
+      return el("div", {}, head, grid);
+    }
+
+    // "Show details" switch: the simple view by default, remembered in this browser.
+    const toggle = document.getElementById("details-toggle");
+    const setDetails = (on) => {
+      document.body.classList.toggle("details", on);
+      toggle.checked = on;
+    };
+    try {
+      setDetails(localStorage.getItem("presenter-details") === "1");
+    } catch {
+      setDetails(false);
+    }
+    toggle.addEventListener("change", () => {
+      setDetails(toggle.checked);
+      try { localStorage.setItem("presenter-details", toggle.checked ? "1" : "0"); } catch {}
+    });
 
     // Every run button, scenario and old suite alike; only one run at a time.
     const allButtons = () => document.querySelectorAll("button");
@@ -255,7 +415,7 @@
         }
         const { exitCode, results: r } = await res.json();
         status.textContent = `${s.title}: ${exitCode === 0 ? "done" : `finished with exit code ${exitCode}`}.`;
-        results.append(el("div", { className: "columns" }, column("accessible", r.accessible), column("broken", r.broken)));
+        results.append(renderRun(r));
       } catch (e) {
         status.textContent = `Request failed: ${e.message}`;
       } finally {

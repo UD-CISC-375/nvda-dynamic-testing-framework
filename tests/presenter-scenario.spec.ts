@@ -21,6 +21,8 @@ type Scenario = {
   id: string;
   path: string;
   title: string;
+  description: string;
+  flaw: string;
   defaultDelay: number;
   setup: Step[];
   axe: { brokenRules: string[]; nvdaOnly: boolean };
@@ -109,8 +111,9 @@ for (const variant of ["accessible", "broken"] as const) {
       const manifest = await (await fetch(new URL("scenarios.json", baseURL))).json();
       const scenario: Scenario | undefined = manifest.scenarios.find((s: Scenario) => s.id === SCENARIO);
       if (!scenario) throw new Error(`presenter: no scenario "${SCENARIO}" in scenarios.json`);
-      const { id, title, path, axe } = scenario;
-      result.scenario = { id, title, path, variant, brokenRules: axe.brokenRules, nvdaOnly: axe.nvdaOnly };
+      const { id, title, path, description, flaw, axe } = scenario;
+      // description and flaw are the page's one-line explanation of the scenario.
+      result.scenario = { id, title, path, variant, description, flaw, brokenRules: axe.brokenRules, nvdaOnly: axe.nvdaOnly };
 
       // Long enough for the slow scenarios' second entry (loading and delayed content: 2000 ms).
       const timeoutMs = scenario.defaultDelay + 2000;
