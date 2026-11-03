@@ -136,3 +136,27 @@ test('watchDom(page, "#a") does not record focus moving outside #a', { tag: "@un
   // The element focus left is still named, even though it's outside #a.
   expect(changes.find((x) => x.type === "focus")?.oldValue).toBe("button#outside");
 });
+
+test("a focus move made after a DOM change comes after it in changes", { tag: "@unit" }, async ({ page }) => {
+  await page.setContent(`<form id="feedback"><button id="send">Send</button></form>`);
+  const watcher = await watchDom(page);
+
+  // Both in one task, like a submit handler that swaps the form for a message
+  // and focuses it. The DOM change is still queued when focusin fires.
+  await page.evaluate(() => {
+    const message = document.createElement("p");
+    message.id = "thanks";
+    message.tabIndex = -1;
+    document.querySelector("#feedback")!.replaceWith(message);
+    message.focus();
+  });
+
+  const changes = await watcher.waitFor(
+    (c) =>
+      c.some((x) => x.type === "focus") &&
+      c.some((x) => x.added.includes("p#thanks")),
+  );
+  const replaced = changes.findIndex((x) => x.added.includes("p#thanks"));
+  const focused = changes.findIndex((x) => x.type === "focus");
+  expect(focused).toBeGreaterThan(replaced);
+});

@@ -122,6 +122,11 @@ export async function watchDom(page: Page, rootSelector = "body") {
         const el = event.target as Node;
         // Only focus landing inside the watched root counts.
         if (!root.contains(el)) return;
+        // focusin fires right away, but DOM changes made earlier in this task
+        // are still queued for the observer. Report those first, so the list
+        // stays in the order things happened. takeRecords() also empties the
+        // queue, so the observer won't report them a second time.
+        reportMutations(observer.takeRecords());
         // relatedTarget is the element losing focus: null when nothing had it.
         const prev = event.relatedTarget as Node | null;
         // Same shape as a DOM change, with the DOM-only fields left empty.
