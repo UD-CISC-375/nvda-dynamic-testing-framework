@@ -36,6 +36,7 @@ export type DomChange = {
  * and focus falls back to <body>, a "focusLost" change is recorded right
  * after the change that removed it, with the removed element as oldValue.
  * No focus event lands anywhere for that, so it would otherwise go unseen.
+ * This includes an element that already had focus when watchDom was called.
  *
  * Only one watcher per page: a second call on the same page throws, because
  * exposeFunction can only register "__reportDomChange" once.
@@ -83,9 +84,16 @@ export async function watchDom(page: Page, rootSelector = "body") {
     const LIVE =
       '[role="status"], [role="alert"], [role="log"], [aria-live]:not([aria-live="off"])';
 
+    // Whatever had focus before watching began. No focusin will fire for it,
+    // so this is the only chance to learn about it.
+    const startFocus = document.activeElement;
     // The element inside root that has focus, so we can tell when it's
     // removed. A live node can't be sent to Node, so it stays in the page.
-    let lastFocused: Element | null = null;
+    // <body> doesn't count: with nothing focused there's nothing to lose.
+    let lastFocused: Element | null =
+      startFocus && startFocus !== document.body && root.contains(startFocus)
+        ? startFocus
+        : null;
 
     // Send a batch of MutationRecords to Node. Named, not inline, so records
     // pulled out early with observer.takeRecords() are reported the same way.
