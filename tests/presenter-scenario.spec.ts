@@ -16,7 +16,8 @@ test.skip(!SCENARIO, "presenter only: set SCENARIO=<id> to run");
 test.setTimeout(120_000);
 
 // One scenario from the manifest, with only the fields used here.
-type Step = { action: string; testid: string; value?: string };
+// label overrides the step's "<action> <testid>" heading.
+type Step = { action: string; testid: string; value?: string; label?: string };
 type Scenario = {
   id: string;
   path: string;
@@ -28,10 +29,12 @@ type Scenario = {
   axe: { brokenRules: string[]; nvdaOnly: boolean };
 };
 
-// Scenarios with no setup get a step here, so there's something to show.
+// Steps run after the registry's setup: scenarios with no setup get one, so there's something
+// to show, and the menu closes again to show the way back to its first state.
 const EXTRA_STEPS: Record<string, Step[]> = {
   "disclosure-tabs": [{ action: "click", testid: "tab-security" }],
   "forms-labels": [{ action: "fill", testid: "full-name", value: "Ann" }],
+  "disclosure-menu": [{ action: "click", testid: "trigger", label: "click trigger again (close)" }],
 };
 
 // The two timeout messages next() throws when nothing more happens.
@@ -132,7 +135,7 @@ for (const variant of ["accessible", "broken"] as const) {
       const steps = [...scenario.setup.filter((s) => s.action !== "waitFor"), ...(EXTRA_STEPS[id] ?? [])];
       for (const step of steps) {
         await runStep(page, step);
-        result.steps.push({ label: `${step.action} ${step.testid}`, entries: await drain(page, testInfo, tracker, timeoutMs) });
+        result.steps.push({ label: step.label ?? `${step.action} ${step.testid}`, entries: await drain(page, testInfo, tracker, timeoutMs) });
       }
     } catch (e) {
       // Keep the message for the page, then fail the test.
