@@ -41,9 +41,20 @@
     /* "Before X2" results, as the old page drew them. */
     #old-results ul { background: #f4f4f4; padding: 0.75rem 1rem; list-style: none; font-family: monospace; }
     #old-results pre { max-height: none; }
+    /* Page on the left, the key on the right; the key stays on screen while scrolling. */
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 21rem; gap: 1.5rem; align-items: start; }
+    #key { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow: auto;
+           border: 2px solid #ccc; border-radius: 6px; padding: 0.6rem 0.8rem; font-size: 0.95rem; background: #fff; }
+    #key h2 { margin: 0 0 0.4rem; font-size: 1.2rem; }
+    #key h3 { margin: 0.8rem 0 0.3rem; font-size: 1rem; border-bottom: 1px solid #ccc; }
+    #key dl { margin: 0; }
+    #key dt { margin-top: 0.35rem; }
+    #key dd { margin: 0.1rem 0 0 0.75rem; color: #333; }
+    #key code { font-size: 0.9rem; }
   </style>
 </head>
 <body>
+  <div class="layout">
   <main>
     <h1>Accessibility tree tracker (X2.6)</h1>
     <!-- Filled from GET /scenarios, one row per category. -->
@@ -57,6 +68,42 @@
     <button type="button" data-suite="aria-tree">Run accessibility-tree tests</button>
     <div id="old-results"></div>
   </main>
+  <!-- Always-visible key. The reason wording matches RULES in tests/helpers/classify.ts. -->
+  <aside id="key" aria-label="Key">
+    <h2>Key</h2>
+    <h3>Entry row</h3>
+    <dl>
+      <dt><strong>e#</strong></dt><dd>Entry number: one per settled change, in order.</dd>
+      <dt><strong>s#</strong></dt><dd>State the entry belongs to. Several entries can share a state.</dd>
+      <dt><span class="badge new">NEW STATE</span></dt><dd>The page is somewhere new: it gets the next state number, and axe scans it.</dd>
+      <dt><span class="badge meaningful">meaningful</span></dt><dd>At least one change below counts as a new state.</dd>
+      <dt><span class="badge recorded">recorded</span></dt><dd>Logged on the current (or an earlier, matching) state. No new state, no axe scan.</dd>
+      <dt><span class="badge">baseline</span></dt><dd>The page as first loaded: state 0.</dd>
+      <dt><span class="chip">reason ?</span></dt><dd>"?" means the team's decision for that rule is still provisional.</dd>
+    </dl>
+    <h3>Reasons: meaningful</h3>
+    <dl id="key-meaningful"></dl>
+    <h3>Reasons: recorded</h3>
+    <dl id="key-recorded"></dl>
+    <h3>Tree diff lines</h3>
+    <dl>
+      <dt><code>+ added</code> / <code>− removed</code></dt><dd>A node (and its subtree) appeared or disappeared.</dd>
+      <dt><code>⇄ replaced</code></dt><dd>Removed and re-added as an identical copy.</dd>
+      <dt><code>✎ text</code> / <code>✎ name</code></dt><dd>A node's text or accessible name changed.</dd>
+      <dt><code>◐ state</code></dt><dd>A state or value changed, e.g. expanded – → true.</dd>
+      <dt><code>↕ reordered</code></dt><dd>Same children, new order (old positions shown).</dd>
+      <dt><code>→ moved</code></dt><dd>A node moved to a new parent.</dd>
+      <dt><code>[e28]</code></dt><dd>The node's ref (only valid for this page load).</dd>
+    </dl>
+    <h3>Focus lines</h3>
+    <dl>
+      <dt><code>focus</code> / <code>focusLost</code></dt><dd>Focus moved to an element, or the focused element was removed.</dd>
+      <dt><code>(was …)</code></dt><dd>What had focus before.</dd>
+      <dt><code>pointerdown / keydown N ms before</code></dt><dd>The user's last action, and how long before the focus move.</dd>
+      <dt><code>relation</code></dt><dd>Where focus landed vs. what was clicked: same, inside it, contains it, or unrelated.</dd>
+    </dl>
+  </aside>
+  </div>
   <script>
     const status = document.getElementById("status");
     const results = document.getElementById("results");
@@ -67,6 +114,35 @@
       const node = Object.assign(document.createElement(tag), props);
       node.append(...children.filter((c) => c !== undefined && c !== null && c !== false));
       return node;
+    }
+
+    // What each classify reason means, by label (see RULES in tests/helpers/classify.ts).
+    // Drawn into the key, and used as the chips' hover text.
+    const REASONS = {
+      meaningful: {
+        "tree:added": "A node appeared.",
+        "tree:removed": "A node disappeared.",
+        "tree:moved": "A node moved to a new parent.",
+        "tree:replaced": "An identical copy was swapped in (provisional).",
+        "focus:page-moved": "The page moved focus somewhere the user didn't send it.",
+        "focus:lost": "The focused element was removed; focus fell to <body>.",
+      },
+      recorded: {
+        "tree:textChanged": "Text inside a node changed.",
+        "tree:stateChanged": "A state or form value changed.",
+        "tree:nameChanged": "A node's name changed.",
+        "tree:reordered": "Siblings changed order.",
+        "tree:matchesState": "Back at an earlier state, so tree changes are only logged.",
+        "focus:followed-click": "Focus went to what the user just clicked.",
+        "focus:followed-tab": "Focus moved after the user pressed Tab.",
+      },
+    };
+    // Fill the key's two reason lists.
+    for (const [label, rows] of Object.entries(REASONS)) {
+      document.getElementById(`key-${label}`).append(...Object.entries(rows).flatMap(([reason, text]) => [
+        el("dt", {}, el("span", { className: `chip ${label}` }, reason)),
+        el("dd", {}, text),
+      ]));
     }
 
     // A <ul> of monospace lines, or "(none)".
@@ -121,7 +197,7 @@
       // The baseline isn't judged (meaningful is false), so it gets its own badge.
       const kind = e.index === 0 ? "baseline" : e.meaningful ? "meaningful" : "recorded";
       const chips = e.classification.changes.map((c) =>
-        el("span", { className: `chip ${c.label}`, title: c.label }, `${c.reason}${c.provisional ? " ?" : ""}`));
+        el("span", { className: `chip ${c.label}`, title: REASONS[c.label]?.[c.reason] ?? c.label },`${c.reason}${c.provisional ? " ?" : ""}`));
       const row = el("div", { className: `entry ${kind}` },
         el("div", { className: "entry-head" },
           el("strong", {}, `e${e.index}`),
