@@ -3,12 +3,14 @@ import type { Page } from "@playwright/test";
 /** One DOM change, copied out of the browser as plain data. */
 export type DomChange = {
   type: "attributes" | "childList" | "characterData";
-  target: string; // e.g. 'button#actions-button'
+  target: string; // e.g. 'button#actions-button' (for text edits: the element holding the text)
   attributeName: string | null; // set when type === "attributes"
   oldValue: string | null; // attribute value before the change (null = attribute was absent)
   newValue: string | null; // attribute value now (null = attribute was removed)
   added: string[]; // nodes inserted (childList changes)
   removed: string[]; // nodes removed (childList changes)
+  text: string | null; // target's text after the change (childList / characterData changes)
+  inLiveRegion: boolean; // inside role=status/alert/log or aria-live, i.e. a screen reader would announce it
 };
 
 /**
@@ -17,12 +19,23 @@ export type DomChange = {
  * BEFORE doing whatever causes the change (e.g. the click), otherwise the
  * change can happen before anyone is listening.
  *
+ * `rootSelector` defaults to "body", which watches the whole page. Use that
+ * when you don't know the page's structure in advance (e.g. someone else's
+ * site); pass a selector to only see changes inside one component.
+ *
+ * Elements are labeled 'tag#id' when they have an id,
+ * 'tag[data-testid="x"]' when they only have a data-testid, and just 'tag'
+ * otherwise.
+ *
+ * Only one watcher per page: a second call on the same page throws, because
+ * exposeFunction can only register "__reportDomChange" once.
+ *
  * Returns:
  *  - changes: the live list of everything recorded so far
  *  - waitFor(isDone, timeoutMs): resolves once isDone(changes) is true,
  *    rejects if that doesn't happen within timeoutMs
  */
-export async function watchDom(page: Page, rootSelector: string) {
+export async function watchDom(page: Page, rootSelector = "body") {
   const changes: DomChange[] = [];
   // Called every time a new change arrives. waitFor() swaps in its own check.
   let onChange = () => {};
@@ -45,18 +58,31 @@ export async function watchDom(page: Page, rootSelector: string) {
     if (!root) throw new Error(`watchDom: nothing matches ${selector}`);
 
     // Turn a DOM node into a short readable label like 'ul#actions-menu'.
-    const describe = (node: Node) =>
-      node instanceof Element
-        ? node.tagName.toLowerCase() + (node.id ? `#${node.id}` : "")
-        : node.nodeName;
+    // Most elements outside a component have no id, so fall back to the
+    // testid ('div[data-testid="toast-region"]') before the bare tag.
+    const describe = (node: Node) => {
+      if (!(node instanceof Element)) return node.nodeName;
+      const tag = node.tagName.toLowerCase();
+      if (node.id) return `${tag}#${node.id}`;
+      const testId = node.getAttribute("data-testid");
+      return testId ? `${tag}[data-testid="${testId}"]` : tag;
+    };
+
+    // Regions whose content changes a screen reader announces without the
+    // user moving focus there (WCAG 4.1.3 Status Messages).
+    const LIVE =
+      '[role="status"], [role="alert"], [role="log"], [aria-live]:not([aria-live="off"])';
 
     const observer = new MutationObserver((records) => {
       for (const r of records) {
+        // A text edit targets the text node itself; report its element instead.
+        const el =
+          r.target instanceof Element ? r.target : r.target.parentElement;
         // MutationRecords hold live DOM nodes, which can't be sent to Node,
         // so we copy out just the strings we care about.
         (window as any).__reportDomChange({
           type: r.type,
-          target: describe(r.target),
+          target: el ? describe(el) : describe(r.target),
           attributeName: r.attributeName,
           oldValue: r.oldValue,
           newValue: r.attributeName
@@ -64,6 +90,8 @@ export async function watchDom(page: Page, rootSelector: string) {
             : null,
           added: Array.from(r.addedNodes).map(describe),
           removed: Array.from(r.removedNodes).map(describe),
+          text: r.type === "attributes" ? null : (el?.textContent ?? null),
+          inLiveRegion: !!el?.closest(LIVE),
         });
       }
     });
@@ -73,6 +101,8 @@ export async function watchDom(page: Page, rootSelector: string) {
       attributes: true, // attribute added / changed / removed
       attributeOldValue: true, // also record the value before the change
       childList: true, // elements inserted / removed
+      characterData: true, // text edited in place (e.g. React updating a {message} slot)
+      characterDataOldValue: true,
     });
   }, rootSelector);
 
