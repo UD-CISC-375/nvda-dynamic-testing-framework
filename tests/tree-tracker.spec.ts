@@ -326,3 +326,42 @@ test.describe("createTreeTracker", () => {
     await expect(tracker.next({ timeoutMs: 600 })).rejects.toThrow("within 600ms");
   });
 });
+
+test.describe("createTreeTracker: returning to an earlier state", () => {
+  // A panel the Open button fills and the Close button inside it empties again.
+  const panel = `
+    <button id="open" onclick="document.getElementById('panel').innerHTML = '<p>Details</p><button id=close>Close</button>'">Open</button>
+    <div id="panel"></div>
+    <script>
+      document.getElementById("panel").addEventListener("click", (e) => {
+        if (e.target.id === "close") document.getElementById("panel").innerHTML = "";
+      });
+    </script>`;
+
+  // Open, then empty the panel with a Reset button outside it (so no focus is lost): back at state 0,
+  // nothing meaningful, so the entry is logged on state 0.
+  test("attaches a recorded return to the earlier state", async ({ page }) => {
+    await page.setContent(panel + `<button onclick="document.getElementById('panel').innerHTML = ''">Reset</button>`);
+    const tracker = await createTreeTracker(page, page.locator("body"));
+    await page.getByRole("button", { name: "Open" }).click();
+    expect(await tracker.next()).toMatchObject({ stateIndex: 1, newState: true });
+    await page.getByRole("button", { name: "Reset" }).click();
+    const back = await tracker.next();
+    expect(back).toMatchObject({ index: 2, stateIndex: 0, newState: false, meaningful: false });
+    // The removal is still in the diff and the history; only its label changed.
+    expect(back.classification.changes.find((c) => c.reason === "tree:matchesState")).toBeTruthy();
+  });
+
+  // Close removes the focused button, so focus is lost on the way back: meaningful, so a new
+  // state (2) even though the tree matches state 0.
+  test("starts a new state when the return is meaningful", async ({ page }) => {
+    await page.setContent(panel);
+    const tracker = await createTreeTracker(page, page.locator("body"));
+    await page.getByRole("button", { name: "Open" }).click();
+    await tracker.next();
+    await page.getByRole("button", { name: "Close" }).click();
+    const back = await tracker.next();
+    expect(back).toMatchObject({ stateIndex: 2, newState: true, meaningful: true });
+    expect(back.focusChanges.map((c) => c.type)).toContain("focusLost");
+  });
+});

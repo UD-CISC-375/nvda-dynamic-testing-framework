@@ -263,8 +263,8 @@ export async function createTreeTracker(page: Page, scope: Locator, options: Set
 
   // Every entry, never deduplicated, so the history keeps the order things happened in.
   const entries: TreeEntry[] = [];
-  // How many states exist; state n is the one entry n's newState started.
-  let stateCount = 0;
+  // One fingerprint per state, by stateIndex: the tree when that state started (and was scanned).
+  const states: string[] = [];
   // The settle key and tree the next change is compared against.
   let lastKey: string;
   let lastTree: AriaNode[];
@@ -282,8 +282,13 @@ export async function createTreeTracker(page: Page, scope: Locator, options: Set
     // Whatever happens, later changes are compared against this tree.
     lastKey = settleKey(snap);
     lastTree = tree;
-    // Label the changes with the definition's table (#129).
-    const classification = classify({ diff, focusChanges });
+    // Back at an earlier state? Any earlier state counts (#130); the most recent match wins.
+    // Only-previous would compare against the current state's fingerprint alone.
+    const print = fingerprint(tree);
+    const match = states.lastIndexOf(print);
+    const matchedState = match === -1 ? undefined : match;
+    // Label the changes with the definition's table (#129); a match makes tree changes recorded.
+    const classification = classify({ diff, focusChanges, matchesState: matchedState !== undefined });
     // The baseline always starts state 0; every other entry goes through decideEntry.
     const decision =
       entries.length === 0
@@ -292,13 +297,14 @@ export async function createTreeTracker(page: Page, scope: Locator, options: Set
             diffCount: diff.length,
             focusCount: focusChanges.length,
             meaningful: classification.meaningful,
+            matchedState,
             currentState: entries[entries.length - 1].stateIndex,
-            stateCount,
+            stateCount: states.length,
           });
     // Nothing worth an entry: the caller keeps waiting.
     if (!decision.entry) return undefined;
-    // A new state takes the next number.
-    if (decision.newState) stateCount++;
+    // A new state takes the next number and remembers its tree.
+    if (decision.newState) states.push(print);
     const entry: TreeEntry = {
       index: entries.length,
       stateIndex: decision.stateIndex,
