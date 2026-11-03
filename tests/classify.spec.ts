@@ -209,8 +209,9 @@ test.describe("classify: focus following the user", () => {
   });
 
   // Clicking non-focusable text drops focus to <body> without a focusin, and #116 doesn't report
-  // it as focusLost. So classify gets no focus record and no tree change: nothing to flag.
-  test("click on a non-focusable div → not meaningful", () => {
+  // it as focusLost. So classify gets no focus record and no tree change. #129 calls this
+  // "recorded": with no record to label, that means logged on the current state, no new state.
+  test("click on a non-focusable div → no new state", () => {
     expect(classify({ diff: [], focusChanges: [] }).meaningful).toBe(false);
   });
 });
