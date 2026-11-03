@@ -6,7 +6,12 @@ export default defineConfig({
   // Locally the report opens in the browser when the run ends (Ctrl+C in the
   // terminal stops the report server). On CI nobody is there to look or press
   // Ctrl+C, so it stays closed.
-  reporter: [['list'], ['html', { open: process.env.CI ? 'never' : 'always' }]],
+  // Custom reporter: builds results/output/results.json from test attachments.
+  reporter: [
+    ['list'],
+    ['html', { open: process.env.CI ? 'never' : 'always' }],
+    ['./reporters/results-reporter.ts'],
+  ],
   use: {
     // Team Y's site. Tests call page.goto('#/...') and Playwright prepends this.
     // The trailing slash matters: without it the relative URL would replace
