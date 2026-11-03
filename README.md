@@ -84,4 +84,9 @@ Sending feedback changes the button to "Sending…", then shows a confirmation. 
 - `tests/submission-confirmation.spec.ts`: the submission confirmation tests.
 - `tests/inline-validation.spec.ts`: checks blur-triggered error feedback for accessible and broken variants, including the live DOM changes and axe scans. The semantic WCAG checks are asserted directly because axe cannot infer whether an error message belongs to a field.
 - `tests/helpers/axe.ts`: `runAxe()` (scan + report attachment) and `diffViolations()` (violations that are new since the before scan).
-- `tests/helpers/watch-dom.ts`: `watchDom()`, a MutationObserver in the page that reports each change back to the test, and `waitFor()`, which waits until the change we expec
+- `tests/helpers/watch-dom.ts`: `watchDom()`, a MutationObserver in the page that reports each change back to the test, and `waitFor()`, which waits until the change we expect has been recorded (or fails after a timeout, listing everything it saw).
+  - `watchDom(page)` watches the whole `<body>`, for pages whose structure you don't know in advance. `watchDom(page, selector)` only watches inside that element. The scenario specs all pass a selector.
+  - Each change names the element it happened on: `tag#id` if the element has an id, otherwise `tag[data-testid="x"]` if it has a testid, otherwise just `tag`.
+  - One watcher per page: calling `watchDom` twice on the same page throws.
+- `tests/watch-dom.spec.ts`: unit tests for `watchDom()`, tagged `@unit`. They build their own pages with `page.setContent`, so they don't need Team Y's site. Run them alone with `npx playwright test --grep @unit --project=chromium`.
+
