@@ -6,8 +6,11 @@ import { join } from "path";
 // buildTree makes small hand-written trees; parseSnapshot reads the captured pairs.
 import { buildTree, parseSnapshot } from "./helpers/parse-snapshot";
 // Import the tracker helpers under test.
-import { decideEntry, fingerprint, waitForSettled } from "./helpers/tree-tracker";
-import type { EntryFacts } from "./helpers/tree-tracker";
+import { decideEntry, fingerprint, installFocusFacts, isFocusRecord, toFocusChange, waitForSettled } from "./helpers/tree-tracker";
+import type { EntryFacts, TrackedChange } from "./helpers/tree-tracker";
+// watchDom produces the focus records the facts are attached to.
+import { watchDom } from "./helpers/watch-dom";
+import type { Page } from "@playwright/test";
 // settleKey gives the last entry's key that waitForSettled compares against.
 import { settleKey } from "./helpers/aria-tree";
 import type { TreeSnapshot } from "./helpers/aria-tree";
@@ -161,5 +164,107 @@ test.describe("decideEntry", () => {
   // Recorded with no match: attach to the current state.
   test("attaches a recorded entry to the current state", () => {
     expect(decideEntry(facts())).toEqual({ entry: true, stateIndex: 1, newState: false });
+  });
+});
+
+test.describe("focus facts", () => {
+  // Load a page, then start watchDom and the fact wrapper on it, the way the tracker will.
+  async function start(page: Page, html: string) {
+    await page.setContent(html);
+    const watcher = await watchDom(page);
+    await installFocusFacts(page);
+    // The nth focus record (counting from 1), once it has arrived, as classify will get it.
+    const focusRecord = async (n = 1) => {
+      const records = await watcher.waitFor((cs) => cs.filter(isFocusRecord).length >= n);
+      return toFocusChange(records.filter(isFocusRecord)[n - 1] as TrackedChange);
+    };
+    return { watcher, focusRecord };
+  }
+
+  // Clicking a button focuses it: a pointerdown just before, on the same element.
+  test("click on a button → pointerdown, same", async ({ page }) => {
+    const { focusRecord } = await start(page, `<button id="save">Save</button>`);
+    await page.getByRole("button", { name: "Save" }).click();
+    const change = await focusRecord();
+    expect(change).toMatchObject({ type: "focus", target: "button#save", relation: "same" });
+    expect(change.lastAction).toMatchObject({ kind: "pointerdown" });
+    expect(change.lastAction!.key).toBeUndefined();
+    // Measured in the same event, so a few ms at most; never negative.
+    expect(change.lastAction!.msBefore).toBeGreaterThanOrEqual(0);
+    expect(change.lastAction!.msBefore).toBeLessThan(100);
+  });
+
+  // The click lands on a span; the button around it gets focus.
+  test("click on a span inside a button → contains", async ({ page }) => {
+    const { focusRecord } = await start(page, `<button id="save"><span id="icon">★</span> Save</button>`);
+    await page.locator("#icon").click();
+    expect((await focusRecord()).relation).toBe("contains");
+  });
+
+  // The click lands on a plain container whose handler focuses a field inside it.
+  test("click that focuses an element inside the target → inside", async ({ page }) => {
+    const { focusRecord } = await start(
+      page,
+      `<div id="card" style="padding:20px" onclick="document.getElementById('name').focus()"><input id="name"></div>`,
+    );
+    // Click the padding, not the input, so the target is the container.
+    await page.locator("#card").click({ position: { x: 2, y: 2 } });
+    expect((await focusRecord()).relation).toBe("inside");
+  });
+
+  // Clicking a label focuses its input; the label stands for that control.
+  test("click on a label → same, via label.control", async ({ page }) => {
+    const { focusRecord } = await start(page, `<label for="name">Name</label> <input id="name">`);
+    await page.getByText("Name").click();
+    expect(await focusRecord()).toMatchObject({ target: "input#name", relation: "same" });
+  });
+
+  // The handler sends focus somewhere else: the second record is unrelated to the click.
+  test("click whose handler focuses another element → unrelated", async ({ page }) => {
+    const { focusRecord } = await start(
+      page,
+      `<button id="go" onclick="document.getElementById('other').focus()">Go</button> <button id="other">Other</button>`,
+    );
+    await page.getByRole("button", { name: "Go" }).click();
+    expect(await focusRecord(2)).toMatchObject({ target: "button#other", relation: "unrelated" });
+  });
+
+  // Tab reports the raw key.
+  test("Tab → keydown with key Tab", async ({ page }) => {
+    const { focusRecord } = await start(page, `<button id="a">A</button>`);
+    await page.keyboard.press("Tab");
+    expect((await focusRecord()).lastAction).toMatchObject({ kind: "keydown", key: "Tab" });
+  });
+
+  // locator.focus() fires no pointerdown or keydown, so the move looks page-made.
+  test("locator.focus() → lastAction null, unrelated", async ({ page }) => {
+    const { focusRecord } = await start(page, `<button id="a">A</button>`);
+    await page.locator("#a").focus();
+    expect(await focusRecord()).toMatchObject({ lastAction: null, relation: "unrelated" });
+  });
+
+  // The clicked button removes itself: focusLost, with relation fixed at unrelated.
+  test("focusLost → unrelated", async ({ page }) => {
+    const { focusRecord } = await start(page, `<button id="x" onclick="this.remove()">Remove me</button>`);
+    await page.getByRole("button", { name: "Remove me" }).click();
+    const lost = await focusRecord(2);
+    expect(lost).toMatchObject({ type: "focusLost", target: "body", oldValue: "button#x", relation: "unrelated" });
+    expect(lost.lastAction).toMatchObject({ kind: "pointerdown" });
+  });
+
+  // A record the wrapper never saw fails loudly instead of getting made-up facts.
+  test("toFocusChange throws on a record without facts", () => {
+    const bare: TrackedChange = {
+      type: "focus",
+      target: "button#a",
+      attributeName: null,
+      oldValue: null,
+      newValue: null,
+      added: [],
+      removed: [],
+      text: null,
+      inLiveRegion: false,
+    };
+    expect(() => toFocusChange(bare)).toThrow("has no focus facts");
   });
 });

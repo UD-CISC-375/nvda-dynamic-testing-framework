@@ -5,6 +5,11 @@ import { flattenGeneric } from "./diff-trees";
 // settleKey is the string compared between polls; TreeSnapshot is one poll.
 import { settleKey } from "./aria-tree";
 import type { TreeSnapshot } from "./aria-tree";
+// Page is where the focus-fact script runs; DomChange is watchDom's record shape.
+import type { Page } from "@playwright/test";
+import type { DomChange } from "./watch-dom";
+// The focus record shape classify takes, and the facts in it.
+import type { FocusChange, LastAction, Relation } from "./classify";
 
 // How long to wait and how often to poll. The settle window is (stableReads - 1) polls in a
 // row that read the same changed tree, each intervalMs apart (200 ms by default).
@@ -121,4 +126,97 @@ export function decideEntry(facts: EntryFacts): EntryDecision {
   if (facts.matchedState !== undefined) return { entry: true, stateIndex: facts.matchedState, newState: false };
   // Recorded anywhere else: log it on the current state.
   return { entry: true, stateIndex: facts.currentState, newState: false };
+}
+
+// The page function watchDom calls with every record (tests/helpers/watch-dom.ts). The
+// tracker wraps it, so this name must stay in step with watchDom's.
+const REPORTER = "__reportDomChange";
+
+// The facts the page measures for one focus or focusLost record, carried on the record itself.
+type FocusFacts = { lastAction: LastAction | null; relation: Relation };
+
+// A watchDom record as the tracker sees it: focus records carry the facts the wrapper added.
+export type TrackedChange = DomChange & { trackerFacts?: FocusFacts };
+
+// Whether a watchDom record is one of the focus kinds classify takes.
+export function isFocusRecord(change: DomChange): boolean {
+  return change.type === "focus" || change.type === "focusLost";
+}
+
+// Record the user's last pointerdown and keydown in the page, and add focus facts to each
+// focus and focusLost record on its way out of watchDom. Call after watchDom has started.
+// watchDom calls REPORTER synchronously inside its own focusin handler (and right after the
+// removal, for focusLost), so document.activeElement here is exactly the element that just got
+// focus: a later focus move can't be measured by mistake. Adds no focusin listener and
+// doesn't touch the DOM, so watchDom records nothing extra.
+export async function installFocusFacts(page: Page): Promise<void> {
+  await page.evaluate((reporter) => {
+    // The reporter is a property watchDom's exposeFunction put on window.
+    const w = window as any;
+    // The last pointerdown or keydown. Kept in the page: its target is a live element.
+    let last: { kind: "pointerdown" | "keydown"; key?: string; target: Element | null; timeStamp: number } | null = null;
+    // Capture phase on window, so a page calling stopPropagation() can't hide an action.
+    window.addEventListener("pointerdown", (e) => {
+      last = { kind: "pointerdown", target: e.target as Element, timeStamp: e.timeStamp };
+    }, true);
+    window.addEventListener("keydown", (e) => {
+      // The raw key: "Tab" for Shift+Tab too.
+      last = { kind: "keydown", key: e.key, target: e.target as Element, timeStamp: e.timeStamp };
+    }, true);
+
+    // Where the focused element sits relative to the action's target, in the order #129 checks.
+    const relationOf = (focused: Element | null, target: Element | null) => {
+      // A click on or in a <label> is a click on the control it labels.
+      const label = target?.closest("label");
+      const t = label?.control ?? target;
+      // Nothing to compare (no focused element, or no target): there's no relation.
+      if (!focused || !t) return "unrelated";
+      // Focus landed on the target itself.
+      if (focused === t) return "same";
+      // Focus landed inside the target.
+      if (t.contains(focused)) return "inside";
+      // The focused element contains the target, e.g. an icon clicked inside a button.
+      if (focused.contains(t)) return "contains";
+      return "unrelated";
+    };
+
+    // Swap in a wrapper that measures, then hands the record on unchanged otherwise.
+    const report = w[reporter];
+    w[reporter] = (change: any) => {
+      // Only focus records get facts; DOM changes pass straight through.
+      if (change.type === "focus" || change.type === "focusLost") {
+        change.trackerFacts = {
+          // timeStamp and performance.now() use the same clock, so this is the gap in ms.
+          lastAction: last
+            ? { kind: last.kind, ...(last.key !== undefined && { key: last.key }), msBefore: performance.now() - last.timeStamp }
+            : null,
+          // focusLost has no focused element to compare (<body> contains everything), and with
+          // no action there's no target: both are "unrelated".
+          relation: change.type === "focusLost" || !last ? "unrelated" : relationOf(document.activeElement, last.target),
+        };
+      }
+      // Hand the record on to watchDom's Node side, facts included.
+      return report(change);
+    };
+  }, REPORTER);
+}
+
+// Turn one watchDom focus record into classify's FocusChange. The only place that builds one.
+// A record without facts means the wrapper never saw it (e.g. watchDom cached its reporter,
+// or the tracker was installed late): throw rather than guess.
+export function toFocusChange(change: TrackedChange): FocusChange {
+  if (!change.trackerFacts) {
+    throw new Error(
+      `tree tracker: ${change.type} record for ${change.target} has no focus facts; ` +
+        `was ${REPORTER} cached, or the tracker installed after watchDom saw focus?`,
+    );
+  }
+  // Keep only the fields classify takes.
+  return {
+    type: change.type as FocusChange["type"],
+    target: change.target,
+    oldValue: change.oldValue,
+    lastAction: change.trackerFacts.lastAction,
+    relation: change.trackerFacts.relation,
+  };
 }
