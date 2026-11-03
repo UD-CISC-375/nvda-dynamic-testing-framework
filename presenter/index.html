@@ -33,6 +33,9 @@
     /* A change only this variant has, and one only the other variant has. */
     .only { background: #fff3a6; font-weight: 600; }
     .missing { color: #b00020; border: 2px dashed #b00020; border-radius: 4px; padding: 0.3rem 0.6rem; margin: 0.4rem 0; font-size: 1.25rem; font-weight: 600; }
+    /* Added / Removed / Changed blocks, drawn like the "Before X2" line diff. */
+    .tree-head { margin: 0.6rem 0 0.2rem; font-size: 1.05rem; }
+    ul.tree-block { background: #e9e9e9; padding: 0.5rem 0.8rem; margin: 0; list-style: none; font-family: monospace; font-size: 1rem; white-space: pre; overflow-x: auto; }
     .badge.axe-ok { background: #d8f3dc; color: #1a5e2a; }
     .badge.axe-bad { background: #ffd6d6; color: #8a0010; }
     .none { color: #666; font-style: italic; }
@@ -117,15 +120,10 @@
     <dl id="key-meaningful"></dl>
     <h3>Reasons: recorded</h3>
     <dl id="key-recorded"></dl>
-    <h3>Tree diff lines</h3>
+    <h3>Tree diff</h3>
     <dl>
-      <dt><code>+ added</code> / <code>− removed</code></dt><dd>A node (and its subtree) appeared or disappeared.</dd>
-      <dt><code>⇄ replaced</code></dt><dd>Removed and re-added as an identical copy.</dd>
-      <dt><code>✎ text</code> / <code>✎ name</code></dt><dd>A node's text or accessible name changed.</dd>
-      <dt><code>◐ state</code></dt><dd>A state or value changed, e.g. expanded – → true.</dd>
-      <dt><code>↕ reordered</code></dt><dd>Same children, new order (old positions shown).</dd>
-      <dt><code>→ moved</code></dt><dd>A node moved to a new parent.</dd>
-      <dt><code>[e28]</code></dt><dd>The node's ref (only valid for this page load).</dd>
+      <dt><strong>Added</strong> / <strong>Removed</strong></dt><dd>Nodes that appeared or disappeared, with everything inside them indented.</dd>
+      <dt><strong>Changed</strong></dt><dd>Nodes that stayed but changed: a state (expanded none → true), text, name, order, parent, or an identical copy swapped in.</dd>
     </dl>
     <h3>Focus lines</h3>
     <dl>
@@ -187,34 +185,47 @@
     // A value as it reads in the tree: strings quoted, true as "true", null as "–".
     const show = (v) => (v === null || v === undefined ? "–" : v === true ? "true" : JSON.stringify(v));
 
-    // How many nodes are in a subtree (the node itself included).
-    const count = (node) => 1 + (node.children ?? []).reduce((n, c) => n + count(c), 0);
+    // One node and its subtree as snapshot-style lines, e.g. `- menu "Actions"` with children
+    // indented two spaces per level, like the "Before X2" diff.
+    function treeLines(node, depth = 0) {
+      const pad = "  ".repeat(depth);
+      // Text nodes are `- text: ...` in a snapshot.
+      if (node.role === "text") return [`${pad}- text: ${node.value ?? ""}`];
+      const name = node.name ? ` "${node.name}"` : "";
+      const states = Object.entries(node.states).map(([k, v]) => (v === true ? ` [${k}]` : ` [${k}=${v}]`)).join("");
+      const value = node.value !== undefined ? `: ${node.value}` : "";
+      return [`${pad}- ${node.role}${name}${states}${value}`, ...node.children.flatMap((c) => treeLines(c, depth + 1))];
+    }
 
-    // One TreeChange as a line (see TreeChange in tests/helpers/diff-trees.ts).
-    function changeLine(c) {
-      const ref = c.ref ? ` [${c.ref}]` : "";
+    // A value in a Changed line: strings quoted, true as "true", missing as "none".
+    const changedValue = (v) => (v === null || v === undefined ? "none" : v === true ? "true" : JSON.stringify(v));
+
+    // One in-place TreeChange as a Changed line: the node, then what changed on it.
+    function changedLine(c) {
+      const node = `- ${nodeOf(c.path)}`;
       switch (c.kind) {
-        case "added":
-          return `+ added ${c.path}${ref} (${count(c.node)} node${count(c.node) === 1 ? "" : "s"})`;
-        case "removed":
-          return `− removed ${c.path}${ref} (${count(c.node)} node${count(c.node) === 1 ? "" : "s"})`;
-        case "replaced":
-          return `⇄ replaced ${c.path}: ${c.beforeRef ?? "?"} → ${c.ref ?? "?"} (identical copy)`;
-        case "textChanged":
-          return `✎ text ${c.path}${ref}: ${show(c.before)} → ${show(c.after)}`;
-        case "nameChanged":
-          return `✎ name ${c.path}${ref}: ${show(c.before)} → ${show(c.after)}`;
         case "stateChanged":
-          return `◐ state ${c.path}${ref}: ` +
-            Object.entries(c.changes).map(([k, v]) => `${k} ${show(v.before)} → ${show(v.after)}`).join(", ");
-        case "reordered":
-          return `↕ reordered children of ${c.path}${ref}: [${c.order.join(", ")}]`;
-        case "moved":
-          return `→ moved ${c.from} → ${c.path}${ref}`;
-        default:
-          // Unknown shape: show it raw rather than guess.
-          return JSON.stringify(c);
+          return `${node}: ` + Object.entries(c.changes).map(([k, v]) => `${k} ${changedValue(v.before)} → ${changedValue(v.after)}`).join(", ");
+        case "textChanged": return `${node}: text ${changedValue(c.before)} → ${changedValue(c.after)}`;
+        case "nameChanged": return `${node}: name ${changedValue(c.before)} → ${changedValue(c.after)}`;
+        case "reordered": return `${node}: children reordered`;
+        case "moved": return `${node}: moved from ${c.from}`;
+        case "replaced": return `${node}: swapped for an identical copy`;
+        default: return JSON.stringify(c);
       }
+    }
+
+    // An entry's tree diff as Added / Removed (always) and Changed (when there is any).
+    function treeBlocks(diff) {
+      if (!diff.length) return [el("p", { className: "none" }, "No tree changes")];
+      const block = (title, items) => [
+        el("h4", { className: "tree-head" }, title),
+        el("ul", { className: "tree-block" }, ...(items.length ? items : ["(none)"]).map((t) => el("li", {}, t))),
+      ];
+      const added = diff.filter((c) => c.kind === "added").flatMap((c) => treeLines(c.node));
+      const removed = diff.filter((c) => c.kind === "removed").flatMap((c) => treeLines(c.node));
+      const changed = diff.filter((c) => c.kind !== "added" && c.kind !== "removed").map(changedLine);
+      return [...block("Added", added), ...block("Removed", removed), ...(changed.length ? block("Changed", changed) : [])];
     }
 
     // One focus record (see FocusChange in tests/helpers/classify.ts).
@@ -236,7 +247,7 @@
           e.newState && el("span", { className: "badge new" }, "NEW STATE"),
           el("span", { className: `badge ${kind}` }, kind),
           ...chips),
-        section(`Tree diff (${e.diff.length})`, lines(e.diff.map(changeLine))),
+        ...treeBlocks(e.diff),
         section(`Focus (${e.focusChanges.length})`, lines(e.focusChanges.map(focusLine))),
         e.axe && section(`axe (${e.axe.length} rule${e.axe.length === 1 ? "" : "s"})`,
           lines(e.axe.map((v) => `${v.id} (${v.impact ?? "?"}), ${v.nodes} node${v.nodes === 1 ? "" : "s"}: ${v.help}`))),
