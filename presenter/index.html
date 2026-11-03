@@ -93,11 +93,11 @@
     <h2>Key</h2>
     <div class="simple-only">
       <dl>
-        <dt><span class="badge meaningful">New state</span></dt><dd>Something appeared or disappeared, or the page moved focus. axe scans it.</dd>
+        <dt><span class="badge meaningful">New state (meaningful)</span></dt><dd>Meets our meaningful-change definition: something appeared or disappeared, or the page moved focus. axe scans it.</dd>
         <dt><span class="badge recorded">Recorded</span></dt><dd>A smaller change: text, a value, a state like expanded, or focus following the click. Logged, no new scan.</dd>
         <dt><span class="badge baseline">Start</span></dt><dd>The page as first loaded.</dd>
         <dt><span class="only">Highlighted line</span></dt><dd>Only this version did it.</dd>
-        <dt><span class="missing">Missing: …</span></dt><dd>The other version did this and this one didn't: what a screen-reader user would miss.</dd>
+        <dt><span class="missing">Only in accessible: …</span></dt><dd>The other version did this and this one didn't. On the broken side, it's what a screen-reader user would miss.</dd>
         <dt><span class="badge axe-ok">axe: 0</span> <span class="badge axe-bad">axe: 1</span></dt><dd>Problems axe found in that state.</dd>
       </dl>
       <p class="none">Turn on "Show details" for the tracker's full data.</p>
@@ -316,7 +316,7 @@
       const kind = e.index === 0 ? "baseline" : e.meaningful ? "meaningful" : "recorded";
       const items = e.classification.changes.flatMap(describe);
       return el("div", { className: `simple ${kind}` },
-        el("span", { className: `badge ${kind}` }, { baseline: "Start", meaningful: "New state", recorded: "Recorded" }[kind]),
+        el("span", { className: `badge ${kind}` }, { baseline: "Start", meaningful: "New state (meaningful)", recorded: "Recorded" }[kind]),
         e.axe && " ",
         e.axe && axeBadge(e.axe),
         items.length
@@ -324,11 +324,15 @@
           : el("p", { className: "meta" }, e.index === 0 ? "Page loaded" : "(no changes)"));
     }
 
-    // One variant's side of a step: simple cards plus what it's missing, and the detail rows.
-    function cell(step, mine, other) {
+    // One variant's side of a step: simple cards plus what only the other variant did, and the
+    // detail rows. otherName ("accessible" or "broken") says whose change a missing line was.
+    function cell(step, mine, other, otherName) {
       const entries = step?.entries ?? [];
-      // What the other variant did in this step and this one didn't.
-      const missing = other ? [...other].filter(([sig]) => !mine.has(sig)).map(([, text]) => el("div", { className: "missing" }, `Missing: ${text}`)) : [];
+      // What the other variant did in this step and this one didn't. Named after the variant that
+      // did it, so it doesn't read as the tracker missing something.
+      const missing = other
+        ? [...other].filter(([sig]) => !mine.has(sig)).map(([, text]) => el("div", { className: "missing" }, `Only in ${otherName}: ${text}`))
+        : [];
       return el("div", { className: "cell" },
         el("div", { className: "simple-only" },
           ...entries.map((e) => simpleEntry(e, other)),
@@ -374,8 +378,8 @@
         const empty = !(sa?.entries.length || sb?.entries.length);
         grid.append(el("div", { className: `step-row${empty ? " detail-only" : ""}` },
           el("h3", { className: "step-title" }, stepName((sa ?? sb).label)),
-          cell(sa, ma, b && mb),
-          cell(sb, mb, a && ma)));
+          cell(sa, ma, b && mb, "broken"),
+          cell(sb, mb, a && ma, "accessible")));
       }
       return el("div", {}, head, grid);
     }
