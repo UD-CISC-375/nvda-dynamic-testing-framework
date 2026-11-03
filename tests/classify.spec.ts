@@ -1,11 +1,17 @@
 // Import Playwright's test runner and assertion library (no browser is used in this file).
 import { test, expect } from "@playwright/test";
-// buildTree makes the small subtrees that added, removed and replaced entries carry.
-import { buildTree } from "./helpers/parse-snapshot";
+// readFileSync and join load the captured snapshot pairs.
+import { readFileSync } from "fs";
+import { join } from "path";
+// buildTree makes the small subtrees that added, removed and replaced entries carry;
+// parseSnapshot reads the captured pairs.
+import { buildTree, parseSnapshot } from "./helpers/parse-snapshot";
+// diffTrees turns the captured pairs into the diff that classify gets from the tracker.
+import { diffTrees } from "./helpers/diff-trees";
 // Import the classifier under test.
 import { classify, FOLLOW_WINDOW_MS } from "./helpers/classify";
 // Types for the hand-built changes and the expected labels.
-import type { FocusChange, Label } from "./helpers/classify";
+import type { Classification, FocusChange, Label } from "./helpers/classify";
 import type { TreeChange } from "./helpers/diff-trees";
 
 // A paragraph subtree for the entries that carry one.
@@ -197,6 +203,116 @@ test.describe("classify: focus following the user", () => {
   // it as focusLost. So classify gets no focus record and no tree change: nothing to flag.
   test("click on a non-focusable div → not meaningful", () => {
     expect(classify({ diff: [], focusChanges: [] }).meaningful).toBe(false);
+  });
+});
+
+// Parse one captured snapshot pair from tests/fixtures/snapshots (recorded by
+// capture-snapshots.spec.ts). Copied from diff-trees.spec.ts: importing a spec file would
+// register its tests a second time.
+function captured(name: string) {
+  const read = (file: string) => readFileSync(join(__dirname, "fixtures", "snapshots", file), "utf8");
+  return parseSnapshot({ content: read(`${name}.default.yaml`), refs: read(`${name}.ai.yaml`) }).tree;
+}
+
+// The diff between two captured pages, as the tracker would hand it to classify.
+const diffOf = (before: string, after: string) => diffTrees(captured(before), captured(after));
+
+// Each change's label and reason, in order, so a failing test shows which row applied.
+const rows = (result: Classification) => result.changes.map((c) => [c.label, c.reason]);
+
+test.describe("classify on captured pages", () => {
+  // Accessible variant: the message is new text in the status role. Logged, no new state.
+  test("polite status, accessible → recorded", () => {
+    const result = classify({ diff: diffOf("polite-accessible-before", "polite-accessible-after") });
+    expect(rows(result)).toEqual([["recorded", "tree:textChanged"]]);
+    expect(result.meaningful).toBe(false);
+  });
+
+  // Broken variant: the message is text on the root after flattening. Still only text.
+  test("polite status, broken → recorded", () => {
+    const result = classify({ diff: diffOf("polite-broken-before", "polite-broken-after") });
+    expect(rows(result)).toEqual([["recorded", "tree:textChanged"]]);
+    expect(result.meaningful).toBe(false);
+  });
+
+  // Sorting reorders the rows and updates the status text: both logged on the current state.
+  test("sortable table → recorded", () => {
+    const result = classify({ diff: diffOf("sortable-unsorted", "sortable-sorted") });
+    expect(rows(result)).toEqual([
+      ["recorded", "tree:reordered"],
+      ["recorded", "tree:textChanged"],
+    ]);
+    expect(result.meaningful).toBe(false);
+  });
+
+  // A real cloneNode swap (new ref, same content): meaningful for now, marked as not yet decided.
+  test("identical copy swapped in → meaningful (provisional)", () => {
+    const result = classify({ diff: diffOf("clone-before", "clone-after") });
+    expect(result.changes).toMatchObject([{ label: "meaningful", reason: "tree:replaced", provisional: true }]);
+    expect(result.meaningful).toBe(true);
+  });
+
+  // Tab moves focus between two buttons; the tree doesn't change at all (focus isn't a tree change).
+  test("Tab between two buttons → recorded", () => {
+    const tabbed = focus({
+      target: "button#two",
+      oldValue: "button#one",
+      lastAction: { kind: "keydown", key: "Tab", msBefore: 3 },
+    });
+    const result = classify({ diff: diffOf("focus-one", "focus-two"), focusChanges: [tabbed] });
+    expect(rows(result)).toEqual([["recorded", "focus:followed-tab"]]);
+    expect(result.meaningful).toBe(false);
+  });
+
+  // Picking a menu item closes the menu, and the item that had focus goes with it.
+  test("menu closes after picking an item and focus is lost → meaningful", () => {
+    const dropped = focus({
+      type: "focusLost",
+      target: "body",
+      oldValue: "li#archive",
+      lastAction: { kind: "pointerdown", msBefore: 5 },
+    });
+    const result = classify({ diff: diffOf("menu-open", "menu-closed"), focusChanges: [dropped] });
+    expect(rows(result)).toEqual([
+      ["recorded", "tree:stateChanged"],
+      ["meaningful", "tree:removed"],
+      ["meaningful", "focus:lost"],
+    ]);
+    expect(result.meaningful).toBe(true);
+  });
+
+  // Escape closes the menu and the page sends focus back to the button that opened it.
+  test("Escape closes the menu and the page returns focus to its button → meaningful", () => {
+    const returned = focus({
+      target: "button#actions-button",
+      oldValue: "li#archive",
+      lastAction: { kind: "keydown", key: "Escape", msBefore: 4 },
+    });
+    const result = classify({ diff: diffOf("menu-open", "menu-closed"), focusChanges: [returned] });
+    expect(rows(result)).toContainEqual(["meaningful", "focus:page-moved"]);
+    expect(result.meaningful).toBe(true);
+  });
+
+  // Closing the menu brings the page back to a state already seen: the removed menu is only logged.
+  test("back to an earlier state → recorded", () => {
+    const result = classify({ diff: diffOf("menu-open", "menu-closed"), matchesState: true });
+    expect(rows(result)).toEqual([
+      ["recorded", "tree:matchesState"],
+      ["recorded", "tree:matchesState"],
+    ]);
+    expect(result.meaningful).toBe(false);
+  });
+
+  // The same return, but focus drops to <body> on the way: focusLost overrides matchesState,
+  // which only speaks for tree changes.
+  test("back to an earlier state with focus lost → meaningful", () => {
+    const result = classify({ diff: diffOf("menu-open", "menu-closed"), focusChanges: [lost], matchesState: true });
+    expect(rows(result)).toEqual([
+      ["recorded", "tree:matchesState"],
+      ["recorded", "tree:matchesState"],
+      ["meaningful", "focus:lost"],
+    ]);
+    expect(result.meaningful).toBe(true);
   });
 });
 
