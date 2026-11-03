@@ -118,7 +118,8 @@
 
     // One entry row: summary line, reason chips, collapsible details.
     function entryRow(e) {
-      const kind = e.meaningful ? "meaningful" : "recorded";
+      // The baseline isn't judged (meaningful is false), so it gets its own badge.
+      const kind = e.index === 0 ? "baseline" : e.meaningful ? "meaningful" : "recorded";
       const chips = e.classification.changes.map((c) =>
         el("span", { className: `chip ${c.label}`, title: c.label }, `${c.reason}${c.provisional ? " ?" : ""}`));
       const row = el("div", { className: `entry ${kind}` },
@@ -144,11 +145,13 @@
         return col;
       }
       const s = r.scenario ?? {};
-      col.append(
+      // filter(Boolean) drops the parts that are left out (no error, no scenario).
+      col.append(...[
         el("h2", { className: r.status }, `${r.status === "passed" ? "✓" : "✗"} ${variant} (${r.status})`),
         r.error && el("p", { className: "failed" }, r.error),
         s.brokenRules && el("p", { className: "meta" }, `axe brokenRules: ${s.brokenRules.length ? s.brokenRules.join(", ") : "(none)"}`),
-        s.nvdaOnly !== undefined && el("p", { className: "meta" }, `nvdaOnly: ${s.nvdaOnly}`));
+        s.nvdaOnly !== undefined && el("p", { className: "meta" }, `nvdaOnly: ${s.nvdaOnly}`),
+      ].filter(Boolean));
       for (const step of r.steps ?? []) {
         col.append(el("div", { className: "step" },
           el("h3", {}, step.label),
