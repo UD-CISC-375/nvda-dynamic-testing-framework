@@ -406,3 +406,57 @@ test.describe("createTreeTracker: the issue's scenarios", () => {
     expect(entry.classification.changes.map((c) => c.reason)).toEqual(["focus:followed-click", "focus:page-moved"]);
   });
 });
+
+test.describe("createTreeTracker on Team Y's pages", () => {
+  // Click a control: a person does it in the "manual" project, Playwright does it otherwise.
+  // Both fire real pointerdown events, so the tracker measures them the same way.
+  async function press(page: Page, manual: boolean, testId: string, prompt: string) {
+    if (manual) console.log(`>>> ${prompt} in the browser window <<<`);
+    else await page.getByTestId(testId).click();
+  }
+
+  // Open the menu (a new state), then close it from its button: the tree is back at the
+  // baseline and nothing meaningful happened, so the closing entry is logged on state 0.
+  test("menu: open is state 1, closing from the button is recorded on state 0", async ({ page }, testInfo) => {
+    const manual = testInfo.project.name === "manual";
+    // A person needs longer than the default to find the button.
+    const wait = manual ? { timeoutMs: 90_000 } : {};
+    await page.goto("#/disclosure/menu?variant=accessible");
+    await expect(page.getByTestId("trigger")).toBeVisible();
+    const tracker = await createTreeTracker(page, page.locator("body"));
+    await press(page, manual, "trigger", "Click the menu button");
+    const opened = await tracker.next(wait);
+    expect(opened).toMatchObject({ stateIndex: 1, newState: true, meaningful: true });
+    await press(page, manual, "trigger", "Click the menu button again to close it");
+    const closed = await tracker.next(wait);
+    expect(closed).toMatchObject({ stateIndex: 0, newState: false, meaningful: false });
+    // Attach the history so the report shows every entry.
+    await testInfo.attach("history.json", { body: JSON.stringify(tracker.history(), null, 2), contentType: "application/json" });
+  });
+
+  // The issue's "clicking X": Team Y's dialog closes with Cancel. The two variants fail
+  // differently, and both are meaningful focus changes.
+  for (const [variant, reason] of [
+    // close() calls opener.focus() itself: the page moved focus.
+    ["accessible", "focus:page-moved"],
+    // The focused Cancel button is removed with the dialog: focus is lost.
+    ["broken", "focus:lost"],
+  ] as const) {
+    test(`dialog ${variant}: Cancel gives a meaningful ${reason}`, async ({ page }, testInfo) => {
+      const manual = testInfo.project.name === "manual";
+      const wait = manual ? { timeoutMs: 90_000 } : {};
+      await page.goto(`#/disclosure/dialog?variant=${variant}&delay=0`);
+      await expect(page.getByTestId("trigger")).toBeVisible();
+      const tracker = await createTreeTracker(page, page.locator("body"));
+      await press(page, manual, "trigger", "Click Open profile settings");
+      await tracker.next(wait);
+      await press(page, manual, "cancel", "Click Cancel");
+      const closed = await tracker.next(wait);
+      // The focus change the issue asks about, labeled meaningful by its own row.
+      const focus = closed.classification.changes.filter((c) => "type" in c.change);
+      expect(focus).toContainEqual(expect.objectContaining({ reason, label: "meaningful" }));
+      expect(closed.meaningful).toBe(true);
+      await testInfo.attach("history.json", { body: JSON.stringify(tracker.history(), null, 2), contentType: "application/json" });
+    });
+  }
+});
