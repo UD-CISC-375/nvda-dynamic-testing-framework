@@ -194,7 +194,8 @@ export async function watchDom(page: Page, rootSelector = "body") {
           // Focus is announced by moving focus, not through a live region.
           inLiveRegion: false,
         });
-        // Set after the flush above, which checks the element focus came from.
+        // Track the new element. Set after the flush only so the flush sees
+        // the state from before this move; the result is the same either way.
         lastFocused = el;
       },
       true,
