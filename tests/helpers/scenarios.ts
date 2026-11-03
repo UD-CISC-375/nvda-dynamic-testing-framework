@@ -1,16 +1,20 @@
 
 import type { APIRequestContext } from "@playwright/test";
 
+// Defines the two possible versions of a scenario
 export type Variant = "accessible" | "broken";
 
+// Defines the categories that scenarios can belong to
 export type Category = "live" | "disclosure" | "forms" | "dynamic";
 
+// Action needed to prepare a scenario before testing
 export interface SetupStep {
   action: "click" | "fill" | "press" | "waitFor";
   testid: string;
   value?: string;
 }
 
+// Defines the information stored for each scenario.
 export interface ScenarioMeta {
   id: string;
   path: string;
@@ -32,6 +36,7 @@ export interface ScenarioMeta {
   };
 }
 
+// URLs generated for each scenario variant
 export interface ScenarioEntry extends ScenarioMeta {
   urls: {
     accessible: string;
@@ -39,6 +44,7 @@ export interface ScenarioEntry extends ScenarioMeta {
   };
 }
 
+// Structure of the entire scenarios.json file
 export interface ScenariosManifest {
   version: number;
   urlParams: {
@@ -50,6 +56,8 @@ export interface ScenariosManifest {
 
 const SUPPORTED_VERSION = 1;
 
+// Uses scenarios.json and returns its scenario entries
+// Uses Playwright's request context so the URL is relative to baseURL
 export async function loadScenarios(
   request: APIRequestContext
 ): Promise<ScenarioEntry[]> {
