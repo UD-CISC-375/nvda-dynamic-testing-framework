@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 0,
+  "run": {
+    "timestamp": "2026-11-03T05:13:19.805Z",
+    "commit": "ece5cb9de8db9fda36f8404bd71512d48fb4229c",
+    "siteUrl": "https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/",
+    "scenarios": [
+      {
+        "scenario": "menu",
+        "variant": "n/a",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "menu",
+        "variant": "accessible",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "menu",
+        "variant": "broken",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [
+                {
+                  "rule": "button-name",
+                  "target": [
+                    ".icon-btn"
+                  ]
+                }
+              ],
+              "resolved": [],
+              "totalCount": 1
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 1
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      }
+    ]
+  }
+}
