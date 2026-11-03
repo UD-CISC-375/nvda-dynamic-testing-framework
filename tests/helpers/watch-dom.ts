@@ -1,11 +1,11 @@
 import type { Page } from "@playwright/test";
 
-/** One DOM change, copied out of the browser as plain data. */
+/** One DOM change (or focus move), copied out of the browser as plain data. */
 export type DomChange = {
-  type: "attributes" | "childList" | "characterData";
-  target: string; // e.g. 'button#actions-button' (for text edits: the element holding the text)
+  type: "attributes" | "childList" | "characterData" | "focus";
+  target: string; // e.g. 'button#actions-button' (for text edits: the element holding the text; for focus: the newly focused element)
   attributeName: string | null; // set when type === "attributes"
-  oldValue: string | null; // attribute value before the change (null = attribute was absent)
+  oldValue: string | null; // attribute value before the change (null = attribute was absent); for focus: the previously focused element (null = none or body)
   newValue: string | null; // attribute value now (null = attribute was removed)
   added: string[]; // nodes inserted (childList changes)
   removed: string[]; // nodes removed (childList changes)
@@ -15,7 +15,8 @@ export type DomChange = {
 
 /**
  * Starts a MutationObserver on the element matching `rootSelector` and
- * records every change inside it. Call this AFTER the page has rendered and
+ * records every change inside it, plus every focus move onto an element
+ * inside it (as type "focus"). Call this AFTER the page has rendered and
  * BEFORE doing whatever causes the change (e.g. the click), otherwise the
  * change can happen before anyone is listening.
  *
@@ -73,7 +74,7 @@ export async function watchDom(page: Page, rootSelector = "body") {
     const LIVE =
       '[role="status"], [role="alert"], [role="log"], [aria-live]:not([aria-live="off"])';
 
-    const observer = new MutationObserver((records) => {
+    const report = (records: MutationRecord[]) => {
       for (const r of records) {
         // A text edit targets the text node itself; report its element instead.
         const el =
@@ -94,7 +95,37 @@ export async function watchDom(page: Page, rootSelector = "body") {
           inLiveRegion: !!el?.closest(LIVE),
         });
       }
-    });
+    };
+    const observer = new MutationObserver(report);
+
+    // Moving focus changes no attribute, child or text, so the observer never
+    // sees it. Listen for it directly, in the capture phase so a handler that
+    // stops propagation can't hide it from us.
+    document.addEventListener(
+      "focusin",
+      (e) => {
+        const el = e.target as Element;
+        if (!root.contains(el)) return;
+        // A script that changes the DOM and then calls .focus() fires focusin
+        // before the observer's batch is delivered. Report that batch first so
+        // the list stays in the order things happened.
+        report(observer.takeRecords());
+        // On focusin, relatedTarget is the element losing focus.
+        const prev = e.relatedTarget as Element | null;
+        (window as any).__reportDomChange({
+          type: "focus",
+          target: describe(el),
+          attributeName: null, // keep null: specs filter changes by attributeName
+          oldValue: prev && prev !== document.body ? describe(prev) : null,
+          newValue: null,
+          added: [],
+          removed: [],
+          text: null,
+          inLiveRegion: !!el.closest(LIVE),
+        });
+      },
+      true,
+    );
 
     observer.observe(root, {
       subtree: true, // watch every descendant, not just root itself
