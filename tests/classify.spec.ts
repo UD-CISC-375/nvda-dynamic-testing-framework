@@ -178,13 +178,21 @@ test.describe("classify: focus following the user", () => {
   // The user clicks Close and the page sends focus back to the button that opened the popup:
   // not where they clicked, so the page moved it.
   test("page returns focus to the opening button after a click → meaningful", () => {
+    // The browser focuses the clicked button first, so watchDom records that move before the page's.
+    const clicked = focus({ target: "button#close", lastAction: { kind: "pointerdown", msBefore: 2 }, relation: "same" });
     const returned = focus({
       target: "button#open",
       oldValue: "button#close",
       lastAction: { kind: "pointerdown", msBefore: 4 },
       relation: "unrelated",
     });
-    expect(reasonOf(returned)).toBe("focus:page-moved");
+    const result = classify({ diff: [], focusChanges: [clicked, returned] });
+    // The click's own focus is only logged; the page's move back to the opener makes the entry meaningful.
+    expect(rows(result)).toEqual([
+      ["recorded", "focus:followed-click"],
+      ["meaningful", "focus:page-moved"],
+    ]);
+    expect(result.meaningful).toBe(true);
   });
 
   // Escape closes the popup and the page sends focus back to the opener: not a Tab, so the page moved it.
