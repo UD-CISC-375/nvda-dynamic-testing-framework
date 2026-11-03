@@ -2,37 +2,224 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Run accessibility tests</title>
+  <title>Accessibility tree tracker demo</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 2rem; }
-    button { font-size: 1.25rem; padding: 0.75rem 1.5rem; }
-    section { margin-top: 1.5rem; }
-    /* No bullets: each tree line already starts with "- ". */
-    ul { background: #f4f4f4; padding: 0.75rem 1rem; list-style: none; font-family: monospace; font-size: 1.1rem; }
-    pre { background: #f4f4f4; padding: 0.75rem 1rem; font-size: 1.1rem; }
+    body { font-family: system-ui, sans-serif; margin: 1.5rem; font-size: 1.15rem; color: #111; background: #fff; }
+    h1 { margin: 0 0 1rem; }
+    h2 { margin: 1.5rem 0 0.5rem; }
+    button { font-size: 1.1rem; padding: 0.5rem 1rem; margin: 0.25rem; }
+    .group { margin: 0.5rem 0; }
+    .group h3 { display: inline-block; width: 7rem; margin: 0; text-transform: capitalize; }
+    #status { font-weight: bold; min-height: 1.5em; }
+    /* Two columns: accessible | broken. */
+    .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+    .column { border: 2px solid #ccc; border-radius: 6px; padding: 0.75rem; min-width: 0; }
+    .column > h2 { margin-top: 0; }
+    .meta { margin: 0.25rem 0; }
+    .step { margin-top: 1rem; }
+    .step > h3 { margin: 0 0 0.25rem; font-size: 1.1rem; border-bottom: 1px solid #ccc; }
+    .none { color: #666; font-style: italic; }
+    .entry { border-left: 6px solid #999; padding: 0.4rem 0.6rem; margin: 0.4rem 0; background: #f6f6f6; }
+    .entry.meaningful { border-color: #b35c00; }
+    .entry.recorded { border-color: #2457a6; }
+    .entry-head > * { margin-right: 0.4rem; }
+    .badge { display: inline-block; padding: 0 0.4rem; border-radius: 4px; font-weight: bold; font-size: 0.95rem; }
+    .badge.new { background: #111; color: #fff; }
+    .badge.meaningful { background: #ffe0bd; color: #6b3600; }
+    .badge.recorded { background: #d6e4fb; color: #163a73; }
+    .chip { display: inline-block; padding: 0 0.4rem; border-radius: 1rem; font-family: monospace; font-size: 0.95rem; border: 1px solid #888; }
+    .chip.meaningful { background: #fff1e0; }
+    .chip.recorded { background: #eaf1fd; }
+    .chip.ignored { background: #eee; }
+    details { margin: 0.3rem 0; }
+    summary { cursor: pointer; font-weight: 600; }
+    ul.lines { margin: 0.25rem 0; padding-left: 1.25rem; font-family: monospace; font-size: 1rem; overflow-wrap: anywhere; }
+    pre { background: #eee; padding: 0.5rem; font-size: 0.9rem; overflow: auto; max-height: 30rem; }
     .passed { color: #1a7f37; }
-    .failed { color: #b00020; }   /* same red as signup-fixed.html */
+    .failed { color: #b00020; }
+    .skipped { color: #666; }
+    /* "Before X2" results, as the old page drew them. */
+    #old-results ul { background: #f4f4f4; padding: 0.75rem 1rem; list-style: none; font-family: monospace; }
+    #old-results pre { max-height: none; }
   </style>
 </head>
 <body>
   <main>
+    <h1>Accessibility tree tracker (X2.6)</h1>
+    <!-- Filled from GET /scenarios, one row per category. -->
+    <section id="scenarios" aria-label="Scenarios"><p class="none">Loading scenarios…</p></section>
+    <p id="status" role="status"></p>
+    <div id="results"></div>
+
+    <h2>Before X2</h2>
     <!-- data-suite is sent to the server as /run?suite=..., see SUITES in server.mjs. -->
     <button type="button" data-suite="watch-dom">Run watch-dom tests</button>
     <button type="button" data-suite="aria-tree">Run accessibility-tree tests</button>
-    <p id="status" role="status"></p>
-    <div id="results"></div>
+    <div id="old-results"></div>
   </main>
   <script>
-    const buttons = document.querySelectorAll("button[data-suite]");
     const status = document.getElementById("status");
     const results = document.getElementById("results");
+    const oldResults = document.getElementById("old-results");
+
+    // Small element builder: el("p", { className: "x" }, "text", child, ...).
+    function el(tag, props = {}, ...children) {
+      const node = Object.assign(document.createElement(tag), props);
+      node.append(...children.filter((c) => c !== undefined && c !== null && c !== false));
+      return node;
+    }
+
+    // A <ul> of monospace lines, or "(none)".
+    const lines = (items) =>
+      items.length ? el("ul", { className: "lines" }, ...items.map((t) => el("li", {}, t))) : el("p", { className: "none" }, "(none)");
+
+    // A collapsible section.
+    const section = (title, ...body) => el("details", {}, el("summary", {}, title), ...body);
+
+    // A value as it reads in the tree: strings quoted, true as "true", null as "–".
+    const show = (v) => (v === null || v === undefined ? "–" : v === true ? "true" : JSON.stringify(v));
+
+    // How many nodes are in a subtree (the node itself included).
+    const count = (node) => 1 + (node.children ?? []).reduce((n, c) => n + count(c), 0);
+
+    // One TreeChange as a line (see TreeChange in tests/helpers/diff-trees.ts).
+    function changeLine(c) {
+      const ref = c.ref ? ` [${c.ref}]` : "";
+      switch (c.kind) {
+        case "added":
+          return `+ added ${c.path}${ref} (${count(c.node)} node${count(c.node) === 1 ? "" : "s"})`;
+        case "removed":
+          return `− removed ${c.path}${ref} (${count(c.node)} node${count(c.node) === 1 ? "" : "s"})`;
+        case "replaced":
+          return `⇄ replaced ${c.path}: ${c.beforeRef ?? "?"} → ${c.ref ?? "?"} (identical copy)`;
+        case "textChanged":
+          return `✎ text ${c.path}${ref}: ${show(c.before)} → ${show(c.after)}`;
+        case "nameChanged":
+          return `✎ name ${c.path}${ref}: ${show(c.before)} → ${show(c.after)}`;
+        case "stateChanged":
+          return `◐ state ${c.path}${ref}: ` +
+            Object.entries(c.changes).map(([k, v]) => `${k} ${show(v.before)} → ${show(v.after)}`).join(", ");
+        case "reordered":
+          return `↕ reordered children of ${c.path}${ref}: [${c.order.join(", ")}]`;
+        case "moved":
+          return `→ moved ${c.from} → ${c.path}${ref}`;
+        default:
+          // Unknown shape: show it raw rather than guess.
+          return JSON.stringify(c);
+      }
+    }
+
+    // One focus record (see FocusChange in tests/helpers/classify.ts).
+    function focusLine(f) {
+      const a = f.lastAction;
+      const action = a ? `${a.kind}${a.key ? ` "${a.key}"` : ""} ${Math.round(a.msBefore)} ms before` : "no user action";
+      return `${f.type}: ${f.target} (was ${f.oldValue ?? "–"}) · ${action} · relation ${f.relation}`;
+    }
+
+    // One entry row: summary line, reason chips, collapsible details.
+    function entryRow(e) {
+      const kind = e.meaningful ? "meaningful" : "recorded";
+      const chips = e.classification.changes.map((c) =>
+        el("span", { className: `chip ${c.label}`, title: c.label }, `${c.reason}${c.provisional ? " ?" : ""}`));
+      const row = el("div", { className: `entry ${kind}` },
+        el("div", { className: "entry-head" },
+          el("strong", {}, `e${e.index}`),
+          el("strong", {}, `s${e.stateIndex}`),
+          e.newState && el("span", { className: "badge new" }, "NEW STATE"),
+          el("span", { className: `badge ${kind}` }, kind),
+          ...chips),
+        section(`Tree diff (${e.diff.length})`, lines(e.diff.map(changeLine))),
+        section(`Focus (${e.focusChanges.length})`, lines(e.focusChanges.map(focusLine))),
+        e.axe && section(`axe (${e.axe.length} rule${e.axe.length === 1 ? "" : "s"})`,
+          lines(e.axe.map((v) => `${v.id} (${v.impact ?? "?"}), ${v.nodes} node${v.nodes === 1 ? "" : "s"}: ${v.help}`))),
+        section("Raw JSON", el("pre", {}, JSON.stringify(e, null, 2))));
+      return row;
+    }
+
+    // One variant's column.
+    function column(variant, r) {
+      const col = el("div", { className: "column" });
+      if (!r) {
+        col.append(el("h2", {}, variant), el("p", { className: "failed" }, "No result (the test didn't run or attach)."));
+        return col;
+      }
+      const s = r.scenario ?? {};
+      col.append(
+        el("h2", { className: r.status }, `${r.status === "passed" ? "✓" : "✗"} ${variant} (${r.status})`),
+        r.error && el("p", { className: "failed" }, r.error),
+        s.brokenRules && el("p", { className: "meta" }, `axe brokenRules: ${s.brokenRules.length ? s.brokenRules.join(", ") : "(none)"}`),
+        s.nvdaOnly !== undefined && el("p", { className: "meta" }, `nvdaOnly: ${s.nvdaOnly}`));
+      for (const step of r.steps ?? []) {
+        col.append(el("div", { className: "step" },
+          el("h3", {}, step.label),
+          step.entries.length ? el("div", {}, ...step.entries.map(entryRow)) : el("p", { className: "none" }, "no entries")));
+      }
+      return col;
+    }
+
+    // Every run button, scenario and old suite alike; only one run at a time.
+    const allButtons = () => document.querySelectorAll("button");
+    const setDisabled = (disabled) => allButtons().forEach((b) => (b.disabled = disabled));
+
+    // Run one scenario and draw both columns.
+    async function runScenario(s) {
+      setDisabled(true);
+      results.textContent = "";
+      oldResults.textContent = "";
+      status.textContent = `Running ${s.title}…`;
+      try {
+        const res = await fetch(`/run?scenario=${encodeURIComponent(s.id)}`, { method: "POST" });
+        if (!res.ok) {
+          // Error replies (already running, Playwright crashed) are plain text.
+          status.textContent = await res.text();
+          return;
+        }
+        const { exitCode, results: r } = await res.json();
+        status.textContent = `${s.title}: ${exitCode === 0 ? "done" : `finished with exit code ${exitCode}`}.`;
+        results.append(el("div", { className: "columns" }, column("accessible", r.accessible), column("broken", r.broken)));
+      } catch (e) {
+        status.textContent = `Request failed: ${e.message}`;
+      } finally {
+        setDisabled(false);
+      }
+    }
+
+    // Draw the scenario buttons, grouped by category in manifest order.
+    async function loadScenarios() {
+      const box = document.getElementById("scenarios");
+      try {
+        const res = await fetch("/scenarios");
+        if (!res.ok) throw new Error(await res.text());
+        const list = await res.json();
+        const groups = new Map();
+        for (const s of list) {
+          if (!groups.has(s.category)) groups.set(s.category, []);
+          groups.get(s.category).push(s);
+        }
+        box.textContent = "";
+        for (const [category, items] of groups) {
+          const row = el("div", { className: "group" }, el("h3", {}, category));
+          for (const s of items) {
+            const b = el("button", { type: "button", title: s.id }, s.title);
+            b.addEventListener("click", () => runScenario(s));
+            row.append(b);
+          }
+          box.append(row);
+        }
+      } catch (e) {
+        box.textContent = `Couldn't load scenarios: ${e.message}`;
+      }
+    }
+    loadScenarios();
+
+    // ---- Before X2: the old watch-dom and aria-tree buttons, drawn as before. ----
 
     // Build an <h3> plus a <ul> of tree lines (or "(none)").
-    function lineList(heading, lines) {
+    function lineList(heading, items) {
       const h = document.createElement("h3");
       h.textContent = heading;
       const ul = document.createElement("ul");
-      for (const line of lines.length ? lines : ["(none)"]) {
+      for (const line of items.length ? items : ["(none)"]) {
         const li = document.createElement("li");
         li.textContent = line;
         ul.append(li);
@@ -58,20 +245,15 @@
       return { added, removed };
     }
 
-    // Both buttons run the same way; only the suite they ask for differs.
-    const setDisabled = (disabled) => buttons.forEach((b) => (b.disabled = disabled));
-
-    for (const button of buttons) button.addEventListener("click", async () => {
+    for (const button of document.querySelectorAll("button[data-suite]")) button.addEventListener("click", async () => {
       const suite = button.dataset.suite;
-      // The server runs one suite at a time, so block both buttons.
       setDisabled(true);
       results.textContent = "";
+      oldResults.textContent = "";
       // The server runs the "manual" project, so Playwright waits for a person to click.
       status.textContent = "Running tests… Click the menu button each time the test browser shows the menu page.";
-      // Ask the local server (server.mjs) to run Playwright; it answers when done.
       const res = await fetch(`/run?suite=${suite}`, { method: "POST" });
       if (!res.ok) {
-        // Error replies (already running, Playwright crashed) are plain text.
         status.textContent = await res.text();
         setDisabled(false);
         return;
@@ -81,46 +263,31 @@
       status.textContent = failed ? `${failed} of ${tests.length} tests failed.` : `All ${tests.length} tests passed.`;
 
       for (const test of tests) {
-        const section = document.createElement("section");
+        const sec = document.createElement("section");
         const h2 = document.createElement("h2");
         const passed = test.status === "passed";
         h2.textContent = `${passed ? "✓" : "✗"} ${test.title}`;
         h2.className = passed ? "passed" : "failed";
-        section.append(h2);
-        if (test.error) {
-          const p = document.createElement("p");
-          p.className = "failed";
-          p.textContent = test.error;
-          section.append(p);
-        }
-        // The aria-tree tests come with added/removed; the watch-dom ones are built
-        // from changes, and only list elements, so their headings say so.
+        sec.append(h2);
+        if (test.error) sec.append(el("p", { className: "failed" }, test.error));
         if (suite === "watch-dom") {
           const { added, removed } = domDiff(test.changes);
-          section.append(...lineList("Elements added", added), ...lineList("Elements removed", removed));
-          // Then what the test printed, as in the terminal, minus the manual
-          // mode's ">>> Click the menu button <<<" prompt and the type, text,
-          // oldValue, newValue and inLiveRegion lines of each printed change.
+          sec.append(...lineList("Elements added", added), ...lineList("Elements removed", removed));
+          // Then what the test printed, minus the manual mode's ">>> Click ... <<<"
+          // prompt and the type, text, oldValue, newValue and inLiveRegion lines.
           const output = test.output
             .split("\n")
             .filter((line) => !line.startsWith(">>>"))
             .filter((line) => !/^\s*(type|text|oldValue|newValue|inLiveRegion):/.test(line))
             .join("\n")
-            // inLiveRegion was the last field, so the line before it now ends
-            // with a comma right before the closing "}"; drop that comma.
+            // inLiveRegion was the last field, so drop the comma left before "}".
             .replace(/,(\n\s*\})/g, "$1")
             .trim();
-          if (output) {
-            const h = document.createElement("h3");
-            h.textContent = "Test output";
-            const pre = document.createElement("pre");
-            pre.textContent = output;
-            section.append(h, pre);
-          }
+          if (output) sec.append(el("h3", {}, "Test output"), el("pre", {}, output));
         } else {
-          section.append(...lineList("Added", test.added), ...lineList("Removed", test.removed));
+          sec.append(...lineList("Added", test.added), ...lineList("Removed", test.removed));
         }
-        results.append(section);
+        oldResults.append(sec);
       }
       setDisabled(false);
     });
