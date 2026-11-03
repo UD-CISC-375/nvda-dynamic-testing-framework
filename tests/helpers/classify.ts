@@ -26,6 +26,10 @@ export const RULES = {
   // Returning to an earlier state: the page is somewhere already scanned, so every tree change
   // is only logged, whatever its kind. Focus changes are still judged on their own.
   "tree:matchesState": { label: "recorded" },
+  // The focused element was removed and focus fell to <body> (#116): the user lost their place.
+  "focus:lost": { label: "meaningful" },
+  // Focus moved somewhere the user didn't send it, e.g. into a dialog or back to the opener.
+  "focus:page-moved": { label: "meaningful" },
   // iframe contents → ignored. No row needed: default-mode snapshots don't go into iframes, so
   // those changes never reach classify ("changes inside an iframe produce no TreeChange" in
   // tests/aria-tree.spec.ts fails if that stops being true).
@@ -36,9 +40,36 @@ export const RULES = {
 // The key of one table row.
 export type Reason = keyof typeof RULES;
 
+// The user's last pointerdown or keydown before a focus change, as the tracker measured it.
+export type LastAction = {
+  kind: "pointerdown" | "keydown";
+  // The raw KeyboardEvent.key on keydown ("Tab" for Shift+Tab too).
+  key?: string;
+  // How long before the focus change it happened.
+  msBefore: number;
+};
+
+// Where the newly focused element sits relative to the last action's target, checked in this
+// order: the same element, inside the target, containing the target (a <span> clicked inside a
+// <button>), or none of those.
+export type Relation = "same" | "inside" | "contains" | "unrelated";
+
+// One focus record from watchDom, with the facts the tracker (#130) measured for it. The first
+// three fields are the ones #115 (focus) and #116 (focusLost) specify for watchDom's records.
+export type FocusChange = {
+  type: "focus" | "focusLost";
+  // Label of the newly focused element ("body" for focusLost).
+  target: string;
+  // Label of the element that had focus before, or null if none or <body>.
+  oldValue: string | null;
+  // null when there was no user action before it.
+  lastAction: LastAction | null;
+  relation: Relation;
+};
+
 // One change with the label its row gave it.
 export type ClassifiedChange = {
-  change: TreeChange;
+  change: TreeChange | FocusChange;
   label: Label;
   reason: Reason;
   // Only on rows whose decision is still pending.
@@ -56,12 +87,14 @@ export type Classification = {
 export type ClassifyInput = {
   // Tree changes from diffTrees (#127, #128).
   diff: TreeChange[];
+  // watchDom's focus and focusLost records since the last entry, in the order they happened.
+  focusChanges?: FocusChange[];
   // Set when the new tree's fingerprint matches an earlier state's.
   matchesState?: boolean;
 };
 
 // Attach a table row's label (and provisional flag, if it has one) to a change.
-function labelled(change: TreeChange, reason: Reason): ClassifiedChange {
+function labelled(change: TreeChange | FocusChange, reason: Reason): ClassifiedChange {
   // Widen to Rule so `provisional` can be read on every row, not only the ones that have it.
   const rule: Rule = RULES[reason];
   // Leave the key out entirely on decided rows, so reports only show it where it matters.
@@ -73,8 +106,20 @@ function labelled(change: TreeChange, reason: Reason): ClassifiedChange {
 // Label every change in one entry with the definition's table. A pure function: an empty
 // input just gives meaningful: false. Whether an empty diff makes a new state is the
 // tracker's call (#130), not this one's.
-export function classify({ diff, matchesState = false }: ClassifyInput): Classification {
+export function classify({ diff, focusChanges = [], matchesState = false }: ClassifyInput): Classification {
   // Back at an earlier state, one row covers every tree change; otherwise the row is the kind's.
-  const changes = diff.map((c) => labelled(c, matchesState ? "tree:matchesState" : `tree:${c.kind}`));
+  const tree = diff.map((c) => labelled(c, matchesState ? "tree:matchesState" : `tree:${c.kind}`));
+  // Focus is judged on its own: matchesState comes from the tree, which holds no focus.
+  const focus = focusChanges.map((c) => labelled(c, focusReason(c)));
+  // Tree changes first, then focus changes, each in the order they came in.
+  const changes = [...tree, ...focus];
   return { meaningful: changes.some((c) => c.label === "meaningful"), changes };
+}
+
+// Pick the table row for one focus record.
+function focusReason(change: FocusChange): Reason {
+  // Focus dropped to <body> because its element was removed.
+  if (change.type === "focusLost") return "focus:lost";
+  // Any other move is one the page made.
+  return "focus:page-moved";
 }
