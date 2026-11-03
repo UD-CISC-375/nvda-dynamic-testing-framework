@@ -1,15 +1,19 @@
-// AriaNode is the parsed tree that fingerprints are taken from.
+// AriaNode is the parsed tree that fingerprints are taken from; parseSnapshot builds it.
+import { parseSnapshot } from "./parse-snapshot";
 import type { AriaNode } from "./parse-snapshot";
 // flattenGeneric drops unnamed wrappers, the same way diffTrees does before comparing.
-import { flattenGeneric } from "./diff-trees";
+import { diffTrees, flattenGeneric } from "./diff-trees";
+import type { TreeChange } from "./diff-trees";
 // settleKey is the string compared between polls; TreeSnapshot is one poll.
-import { settleKey } from "./aria-tree";
+import { settleKey, snapshotTree } from "./aria-tree";
 import type { TreeSnapshot } from "./aria-tree";
 // Page is where the focus-fact script runs; DomChange is watchDom's record shape.
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+import { watchDom } from "./watch-dom";
 import type { DomChange } from "./watch-dom";
-// The focus record shape classify takes, and the facts in it.
-import type { FocusChange, LastAction, Relation } from "./classify";
+// classify judges each entry; the types are its input and output shapes.
+import { classify } from "./classify";
+import type { Classification, FocusChange, LastAction, Relation } from "./classify";
 
 // How long to wait and how often to poll. The settle window is (stableReads - 1) polls in a
 // row that read the same changed tree, each intervalMs apart (200 ms by default).
@@ -220,3 +224,145 @@ export function toFocusChange(change: TrackedChange): FocusChange {
     relation: change.trackerFacts.relation,
   };
 }
+
+// One settled change (or the baseline), as plain JSON-serializable data for reports (#102).
+export type TreeEntry = {
+  // Position in the history, from 0 (the baseline).
+  index: number;
+  // The state this entry belongs to: the one it started, or the one it was logged on.
+  stateIndex: number;
+  // True when this entry started its state, i.e. the state to scan. The baseline is one.
+  newState: boolean;
+  // The parsed tree after the change, and the focused ref (kept for reports only).
+  tree: AriaNode[];
+  focusedRef?: string;
+  // What changed since the last entry: tree changes, then watchDom's focus records.
+  diff: TreeChange[];
+  focusChanges: FocusChange[];
+  // classify's labels for the changes, and its verdict.
+  classification: Classification;
+  meaningful: boolean;
+  // When the change settled (ms since the epoch).
+  timestamp: number;
+};
+
+// Start watching `scope` and record a settled baseline: entry 0, state 0. `scope` only picks
+// what gets snapshotted; watchDom always watches <body>, so focus moving out of the component
+// (the meaningful case) is still seen. Only one watchDom can run per page, so use
+// tracker.watcher instead of calling watchDom again.
+export async function createTreeTracker(page: Page, scope: Locator, options: SettleOptions = {}) {
+  // The tracker's settle options, with defaults filled in; next() can override them per call.
+  const settle = { ...SETTLE_DEFAULTS, ...options };
+  // watchDom first, so the fact wrapper has a reporter to wrap.
+  const watcher = await watchDom(page, "body");
+  await installFocusFacts(page);
+  // Both snapshots of one moment, as every poll takes them.
+  const read = () => snapshotTree(scope);
+  // watchDom's focus records so far, in order.
+  const focusRecords = () => watcher.changes.filter(isFocusRecord) as TrackedChange[];
+
+  // Every entry, never deduplicated, so the history keeps the order things happened in.
+  const entries: TreeEntry[] = [];
+  // How many states exist; state n is the one entry n's newState started.
+  let stateCount = 0;
+  // The settle key and tree the next change is compared against.
+  let lastKey: string;
+  let lastTree: AriaNode[];
+  // How many focus records earlier entries took. An entry takes every record up to the moment
+  // it's returned, so one arriving while the tree settles goes with that entry.
+  let taken = 0;
+
+  // Add one entry from a settled poll, if decideEntry says it makes one.
+  function record(
+    snap: TreeSnapshot,
+    { tree, focusedRef }: ReturnType<typeof parseSnapshot>,
+    diff: TreeChange[],
+    focusChanges: FocusChange[],
+  ): TreeEntry | undefined {
+    // Whatever happens, later changes are compared against this tree.
+    lastKey = settleKey(snap);
+    lastTree = tree;
+    // Label the changes with the definition's table (#129).
+    const classification = classify({ diff, focusChanges });
+    // The baseline always starts state 0; every other entry goes through decideEntry.
+    const decision =
+      entries.length === 0
+        ? ({ entry: true, stateIndex: 0, newState: true } as const)
+        : decideEntry({
+            diffCount: diff.length,
+            focusCount: focusChanges.length,
+            meaningful: classification.meaningful,
+            currentState: entries[entries.length - 1].stateIndex,
+            stateCount,
+          });
+    // Nothing worth an entry: the caller keeps waiting.
+    if (!decision.entry) return undefined;
+    // A new state takes the next number.
+    if (decision.newState) stateCount++;
+    const entry: TreeEntry = {
+      index: entries.length,
+      stateIndex: decision.stateIndex,
+      newState: decision.newState,
+      tree,
+      ...(focusedRef !== undefined && { focusedRef }),
+      diff,
+      focusChanges,
+      classification,
+      meaningful: classification.meaningful,
+      timestamp: Date.now(),
+    };
+    entries.push(entry);
+    return entry;
+  }
+
+  // Take every focus record no entry has taken yet.
+  function takeFocus(): FocusChange[] {
+    // Read the list once, so a record arriving mid-way is neither lost nor taken twice.
+    const all = focusRecords();
+    // The new ones, as classify's FocusChange (throws if one has no facts).
+    const fresh = all.slice(taken).map(toFocusChange);
+    taken = all.length;
+    return fresh;
+  }
+
+  // The baseline: the first tree that holds still. Focus records before it belong to page load.
+  const baseline = await waitForSettled(read, undefined, () => false, settle);
+  taken = focusRecords().length;
+  record(baseline, parseSnapshot(baseline), [], []);
+
+  return {
+    watcher,
+    // Every entry so far, oldest first (a copy, so callers can't rewrite the history).
+    history: (): TreeEntry[] => [...entries],
+    // Wait for the next settled change against the last entry and return its entry. Runs
+    // whenever it's called, with or without a user action just before. Throws if nothing
+    // settles within timeoutMs.
+    async next(overrides: SettleOptions = {}): Promise<TreeEntry> {
+      // This call's options: the tracker's, with any overrides on top.
+      const opts = { ...settle, ...overrides };
+      // One deadline for the whole call, even if some settled polls make no entry.
+      const deadline = Date.now() + opts.timeoutMs;
+      for (;;) {
+        // Time left; out of it means nothing worth an entry happened.
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) throw new Error(`tree tracker: no new entry within ${opts.timeoutMs}ms`);
+        // Wait for a settled new tree, or for focus records on an unchanged one.
+        const snap = await waitForSettled(read, lastKey, () => focusRecords().length > taken, {
+          ...opts,
+          timeoutMs: remaining,
+        });
+        // Parse once; the entry keeps this tree.
+        const parsed = parseSnapshot(snap);
+        // Diff against the last entry's tree (or the last settled tree that made no entry).
+        const diff = diffTrees(lastTree, parsed.tree);
+        // Focus records are taken after settling, so late ones go with this entry.
+        const entry = record(snap, parsed, diff, takeFocus());
+        // No entry (nothing survived the diff and focus didn't move): keep waiting.
+        if (entry) return entry;
+      }
+    },
+  };
+}
+
+// What createTreeTracker returns.
+export type TreeTracker = Awaited<ReturnType<typeof createTreeTracker>>;

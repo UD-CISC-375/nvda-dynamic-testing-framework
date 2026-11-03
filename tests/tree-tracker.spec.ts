@@ -6,7 +6,15 @@ import { join } from "path";
 // buildTree makes small hand-written trees; parseSnapshot reads the captured pairs.
 import { buildTree, parseSnapshot } from "./helpers/parse-snapshot";
 // Import the tracker helpers under test.
-import { decideEntry, fingerprint, installFocusFacts, isFocusRecord, toFocusChange, waitForSettled } from "./helpers/tree-tracker";
+import {
+  createTreeTracker,
+  decideEntry,
+  fingerprint,
+  installFocusFacts,
+  isFocusRecord,
+  toFocusChange,
+  waitForSettled,
+} from "./helpers/tree-tracker";
 import type { EntryFacts, TrackedChange } from "./helpers/tree-tracker";
 // watchDom produces the focus records the facts are attached to.
 import { watchDom } from "./helpers/watch-dom";
@@ -266,5 +274,55 @@ test.describe("focus facts", () => {
       inLiveRegion: false,
     };
     expect(() => toFocusChange(bare)).toThrow("has no focus facts");
+  });
+});
+
+test.describe("createTreeTracker", () => {
+  // The baseline is entry 0, state 0, and the first state to scan; it has nothing to diff.
+  test("records the baseline as entry 0 and state 0", async ({ page }) => {
+    await page.setContent(`<button>Save</button>`);
+    const tracker = await createTreeTracker(page, page.locator("body"));
+    const [baseline] = tracker.history();
+    expect(baseline).toMatchObject({ index: 0, stateIndex: 0, newState: true, diff: [], focusChanges: [], meaningful: false });
+    expect(tracker.history()).toHaveLength(1);
+  });
+
+  // A node added is meaningful: a new state. A text change after it is logged on that state.
+  test("starts a new state for a meaningful entry and logs recorded ones on it", async ({ page }) => {
+    await page.setContent(
+      `<button onclick="document.getElementById('out').innerHTML = '<p id=msg>Saving</p>'">Save</button><div id="out"></div>`,
+    );
+    const tracker = await createTreeTracker(page, page.locator("body"));
+    await page.getByRole("button", { name: "Save" }).click();
+    const added = await tracker.next();
+    expect(added).toMatchObject({ index: 1, stateIndex: 1, newState: true, meaningful: true });
+    expect(added.diff.map((c) => c.kind)).toEqual(["added"]);
+    // The page changes on its own, with no user action: still an entry.
+    await page.evaluate(() => (document.getElementById("msg")!.textContent = "Saved"));
+    const text = await tracker.next();
+    expect(text).toMatchObject({ index: 2, stateIndex: 1, newState: false, meaningful: false });
+    expect(text.diff.map((c) => c.kind)).toEqual(["textChanged"]);
+    // Entries are plain data: what's in the history survives a JSON round trip.
+    expect(JSON.parse(JSON.stringify(tracker.history()))).toEqual(tracker.history());
+  });
+
+  // A focus move made after paint, while the tree is still settling, goes with the same entry:
+  // no separate focus-only entry (which would look page-made and fake a new state).
+  test("an entry takes focus records that arrive while the tree settles", async ({ page }) => {
+    await page.setContent(`
+      <button id="open">Open</button><ul id="list"></ul>
+      <script>
+        document.getElementById("open").onclick = () => {
+          document.getElementById("list").innerHTML = '<li><a id="first" href="#">First</a></li>';
+          // Like a useEffect focusing the first item after paint, but slower.
+          setTimeout(() => document.getElementById("first").focus(), 150);
+        };
+      </script>`);
+    const tracker = await createTreeTracker(page, page.locator("body"));
+    await page.getByRole("button", { name: "Open" }).click();
+    const opened = await tracker.next();
+    expect(opened.focusChanges.map((c) => c.target)).toEqual(["button#open", "a#first"]);
+    // Nothing is left over for a focus-only entry.
+    await expect(tracker.next({ timeoutMs: 600 })).rejects.toThrow("within 600ms");
   });
 });
