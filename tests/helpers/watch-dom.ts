@@ -2,10 +2,10 @@ import type { Page } from "@playwright/test";
 
 /** One DOM change, copied out of the browser as plain data. */
 export type DomChange = {
-  type: "attributes" | "childList" | "characterData";
-  target: string; // e.g. 'button#actions-button' (for text edits: the element holding the text)
+  type: "attributes" | "childList" | "characterData" | "focus";
+  target: string; // e.g. 'button#actions-button' (for text edits: the element holding the text; for focus: the element now focused)
   attributeName: string | null; // set when type === "attributes"
-  oldValue: string | null; // attribute value before the change (null = attribute was absent)
+  oldValue: string | null; // attribute value before the change (null = attribute was absent); for focus: the element that had focus (null = none or <body>)
   newValue: string | null; // attribute value now (null = attribute was removed)
   added: string[]; // nodes inserted (childList changes)
   removed: string[]; // nodes removed (childList changes)
@@ -19,12 +19,28 @@ export type DomChange = {
  * BEFORE doing whatever causes the change (e.g. the click), otherwise the
  * change can happen before anyone is listening.
  *
+ * `rootSelector` defaults to "body", which watches the whole page. Use that
+ * when you don't know the page's structure in advance (e.g. someone else's
+ * site); pass a selector to only see changes inside one component.
+ *
+ * Elements are labeled 'tag#id' when they have an id,
+ * 'tag[data-testid="x"]' when they only have a data-testid, and just 'tag'
+ * otherwise.
+ *
+ * Focus moves (by script or keyboard) onto an element inside the root are
+ * recorded too, as type "focus", because they don't mutate the DOM and the
+ * observer can't see them. Note that Playwright's .click() focuses what it
+ * clicks, so a click usually records a focus change first.
+ *
+ * Only one watcher per page: a second call on the same page throws, because
+ * exposeFunction can only register "__reportDomChange" once.
+ *
  * Returns:
  *  - changes: the live list of everything recorded so far
  *  - waitFor(isDone, timeoutMs): resolves once isDone(changes) is true,
  *    rejects if that doesn't happen within timeoutMs
  */
-export async function watchDom(page: Page, rootSelector: string) {
+export async function watchDom(page: Page, rootSelector = "body") {
   const changes: DomChange[] = [];
   // Called every time a new change arrives. waitFor() swaps in its own check.
   let onChange = () => {};
@@ -47,17 +63,24 @@ export async function watchDom(page: Page, rootSelector: string) {
     if (!root) throw new Error(`watchDom: nothing matches ${selector}`);
 
     // Turn a DOM node into a short readable label like 'ul#actions-menu'.
-    const describe = (node: Node) =>
-      node instanceof Element
-        ? node.tagName.toLowerCase() + (node.id ? `#${node.id}` : "")
-        : node.nodeName;
+    // Most elements outside a component have no id, so fall back to the
+    // testid ('div[data-testid="toast-region"]') before the bare tag.
+    const describe = (node: Node) => {
+      if (!(node instanceof Element)) return node.nodeName;
+      const tag = node.tagName.toLowerCase();
+      if (node.id) return `${tag}#${node.id}`;
+      const testId = node.getAttribute("data-testid");
+      return testId ? `${tag}[data-testid="${testId}"]` : tag;
+    };
 
     // Regions whose content changes a screen reader announces without the
     // user moving focus there (WCAG 4.1.3 Status Messages).
     const LIVE =
       '[role="status"], [role="alert"], [role="log"], [aria-live]:not([aria-live="off"])';
 
-    const observer = new MutationObserver((records) => {
+    // Send a batch of MutationRecords to Node. Named, not inline, so records
+    // pulled out early with observer.takeRecords() are reported the same way.
+    const reportMutations = (records: MutationRecord[]) => {
       for (const r of records) {
         // A text edit targets the text node itself; report its element instead.
         const el =
@@ -78,8 +101,10 @@ export async function watchDom(page: Page, rootSelector: string) {
           inLiveRegion: !!el?.closest(LIVE),
         });
       }
-    });
+    };
 
+    // The browser calls reportMutations with each batch of changes under root.
+    const observer = new MutationObserver(reportMutations);
     observer.observe(root, {
       subtree: true, // watch every descendant, not just root itself
       attributes: true, // attribute added / changed / removed
@@ -88,6 +113,39 @@ export async function watchDom(page: Page, rootSelector: string) {
       characterData: true, // text edited in place (e.g. React updating a {message} slot)
       characterDataOldValue: true,
     });
+
+    // Focus moves change no DOM, so listen for them directly. Capture phase on
+    // document, so a page calling stopPropagation() can't hide one from us.
+    document.addEventListener(
+      "focusin",
+      (event) => {
+        const el = event.target as Node;
+        // Only focus landing inside the watched root counts.
+        if (!root.contains(el)) return;
+        // focusin fires right away, but DOM changes made earlier in this task
+        // are still queued for the observer. Report those first, so the list
+        // stays in the order things happened. takeRecords() also empties the
+        // queue, so the observer won't report them a second time.
+        reportMutations(observer.takeRecords());
+        // relatedTarget is the element losing focus: null when nothing had it.
+        const prev = event.relatedTarget as Node | null;
+        // Same shape as a DOM change, with the DOM-only fields left empty.
+        (window as any).__reportDomChange({
+          type: "focus",
+          target: describe(el),
+          attributeName: null,
+          // <body> having focus means nothing did, so treat it like null.
+          oldValue: prev && prev !== document.body ? describe(prev) : null,
+          newValue: null,
+          added: [],
+          removed: [],
+          text: null,
+          // Focus is announced by moving focus, not through a live region.
+          inLiveRegion: false,
+        });
+      },
+      true,
+    );
   }, rootSelector);
 
   return {
