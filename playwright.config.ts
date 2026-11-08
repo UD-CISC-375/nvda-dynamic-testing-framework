@@ -7,7 +7,13 @@ export default defineConfig({
   // Locally the report opens in the browser when the run ends (Ctrl+C in the
   // terminal stops the report server). On CI nobody is there to look or press
   // Ctrl+C, so it stays closed.
-  reporter: [['list'], ['html', { open: process.env.CI ? 'never' : 'always' }]],
+  reporter: [
+    ['list'],
+    // Keep Playwright's HTML report for traces, but do not auto-open it.
+    // The accessible reporter opens instead, with the graphical / Markdown toggle.
+    ['html', { open: 'never' }],
+    ['./accessible-markdown-reporter.ts'],
+  ],
   use: {
     trace: process.env.CI ? 'on-first-retry' : 'off',
     // Team Y's site. Tests call page.goto('#/...') and Playwright prepends this.
