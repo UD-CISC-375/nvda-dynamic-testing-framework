@@ -1,4 +1,5 @@
 name: CI
+run-name: "Test site: ${{ github.event_name == 'schedule' && 'live' || github.event_name == 'workflow_dispatch' && inputs.site_branch || 'main' }}"
 
 on:
   pull_request:
@@ -7,6 +8,15 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      site_branch:
+        description: Team Y site branch to build and test
+        required: true
+        default: main
+        type: string
 
 jobs:
   test:
@@ -26,18 +36,20 @@ jobs:
         run: npm ci
 
       - name: Check out Team Y site
+        if: github.event_name != 'schedule'
         uses: actions/checkout@v4
         with:
           repository: mlorang/nvda-dynamic-testing-webpage
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.site_branch || 'main' }}
           path: nvda-dynamic-testing-webpage
 
       - name: Install and build Team Y site
+        if: github.event_name != 'schedule'
         working-directory: nvda-dynamic-testing-webpage
         run: |
           npm ci
           CI=false npm run build
           mkdir -p ../site-root
-          rm -rf ../site-root/nvda-dynamic-testing-webpage
           cp -R build ../site-root/nvda-dynamic-testing-webpage
 
       - name: Install Playwright Chromium
@@ -46,9 +58,15 @@ jobs:
       - name: Type-check
         run: npm run type-check
 
-      - name: Run Playwright tests
+      - name: Run Playwright tests against site build
+        if: github.event_name != 'schedule'
         env:
           BASE_URL: http://127.0.0.1:4173/nvda-dynamic-testing-webpage/
+          LOCAL_BUILD: '1'
+        run: npm test
+
+      - name: Run Playwright tests against live site
+        if: github.event_name == 'schedule'
         run: npm test
 
       - name: Upload Playwright report
