@@ -32,7 +32,7 @@ npx playwright install chromium
 | `npm run test:manual` | A browser opens and waits for **you** to click the menu button (2 min per test) |
 | `npx playwright show-report` | Reopens the HTML report from the last run |
 
-CI builds Team Y's `main` branch for push and pull request runs. The nightly scheduled run tests the live GitHub Pages site. To test another site branch, open the CI workflow in GitHub Actions, choose **Run workflow**, and enter the branch name in **site_branch**; the run name shows the selected branch. Developers can also use `npm run test:local-build` to test a fresh local build manually.
+Pull request runs, pushes to `main`, and the nightly scheduled run test the live GitHub Pages site. To test a site branch's build as a backup, open the CI workflow in GitHub Actions, choose **Run workflow**, and enter the branch name in **site_branch** (default: `main`); the run name shows the selected branch. Developers can also use `npm run test:local-build` to test a fresh local build manually.
 
 The HTML report opens in your browser automatically when a run finishes (press Ctrl+C in the terminal to stop the report server). In the report, each test has these attachments:
 
