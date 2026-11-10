@@ -10,9 +10,7 @@ The pages under test come from a companion repository: **[nvda-dynamic-testing-w
 
 ## Why this exists
 
-Accessibility scanners like axe check a page at one moment. Modern pages change after they load: menus open, errors appear, results stream in. A screen reader only learns about these changes if the page reports them through the accessibility API, for example with state attributes like `aria-expanded`, with live regions, or by moving focus.
-
-A scan before and a scan after the change often can't tell the difference. On the broken menu button, axe reports the same single violation before and after the menu opens. axe can't know the button should now announce "expanded". In **10 of the 16 scenarios, axe reports nothing wrong with the broken variant**. The flaw only shows up if you check what kind of change happened, which is what this framework does.
+Accessibility scanners like axe check a page at a single moment. Many modern websites update dynamically, though, and a page that passes can become inaccessible once those updates happen. Right now there is no easy way to test these dynamic parts. Developers have to write a custom test by hand for every scenario they want to check, such as clicking a button that opens a list. That takes a long time, and it's easy to miss states. This project aims to make it easier for developers to check whether a dynamic website stays accessible, without writing those tests by hand.
 
 ## Status
 
@@ -27,13 +25,13 @@ What's on `main`:
 
 Pending (open PRs, not merged):
 
-| PR | What it adds |
-|---|---|
+| PR                                                                                                                                                                                                                                                                                                                                | What it adds                                                                                                                                                                                                                              |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [#145](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/145) → [#159](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/159) → [#160](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/160) → [#161](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/161) | X2.2–X2.5, a stack where each PR builds on the one before. Parse and merge the snapshots into one tree, a hierarchy-aware diff, detection of replaced-but-identical nodes, and a classifier that applies the meaningful-change definition |
-| [#141](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/141) | Sortable table scenario tests |
-| [#147](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/147) | Load more scenario tests |
-| [#151](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/151) | Results report that builds `results.json` |
-| [#158](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/158) | Nightly test run against the live site |
+| [#141](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/141)                                                                                                                                                                                                                                                    | Sortable table scenario tests                                                                                                                                                                                                             |
+| [#147](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/147)                                                                                                                                                                                                                                                    | Load more scenario tests                                                                                                                                                                                                                  |
+| [#151](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/151)                                                                                                                                                                                                                                                    | Results report that builds `results.json`                                                                                                                                                                                                 |
+| [#158](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/158)                                                                                                                                                                                                                                                    | Nightly test run against the live site                                                                                                                                                                                                    |
 
 Next steps:
 
@@ -55,15 +53,15 @@ npm test
 
 By default the tests run against the [live test site](https://ud-cisc-375.github.io/nvda-dynamic-testing-webpage/). Set `BASE_URL` to point them at another copy, for example a local build.
 
-| Command | What it does |
-|---|---|
-| `npm test` | Runs the whole suite headless. Playwright performs every click itself |
-| `npm run test:headed` | Same, with a visible browser |
-| `npm run test:manual` | Opens a browser and waits for **you** to do the interaction (click the menu button, and so on). Supported by the menu, accordion, dialog, loading, toast, polite status, and assertive alert tests |
-| `npx playwright test --grep @unit --project=chromium` | Only the `watchDom` unit tests. These build their own pages and don't need the test site |
-| `npm run type-check` | TypeScript check with no output files |
-| `npm run test:local-build` | Does what CI does: clones and builds the test site, serves it locally, then type-checks and tests |
-| `npx playwright show-report` | Reopens the HTML report from the last run |
+| Command                                               | What it does                                                                                                                                                                                       |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm test`                                            | Runs the whole suite headless. Playwright performs every click itself                                                                                                                              |
+| `npm run test:headed`                                 | Same, with a visible browser                                                                                                                                                                       |
+| `npm run test:manual`                                 | Opens a browser and waits for **you** to do the interaction (click the menu button, and so on). Supported by the menu, accordion, dialog, loading, toast, polite status, and assertive alert tests |
+| `npx playwright test --grep @unit --project=chromium` | Only the `watchDom` unit tests. These build their own pages and don't need the test site                                                                                                           |
+| `npm run type-check`                                  | TypeScript check with no output files                                                                                                                                                              |
+| `npm run test:local-build`                            | Does what CI does: clones and builds the test site, serves it locally, then type-checks and tests                                                                                                  |
+| `npx playwright show-report`                          | Reopens the HTML report from the last run                                                                                                                                                          |
 
 The HTML report opens automatically after a local run. Press Ctrl+C to stop the report server. Each test attaches its evidence to the report: the axe results (`axe-before.json`, `axe-after.json`), the accessibility trees and their diff (`tree-*.yaml`, `tree-*-diff.json`), and the logged DOM changes (`stdout`).
 
@@ -93,24 +91,24 @@ The project's working definition of a **meaningful change** is something being a
 
 axe column: rules axe flags in the **broken** variant, according to the test site's manifest. "Nothing" means the flaw can only be caught by checking the change itself.
 
-| Scenario | Route | WCAG | axe flags | What our tests check beyond axe | Spec |
-|---|---|---|---|---|---|
-| Polite status message | `/live/polite` | 4.1.3 | nothing | Message lands in a `role="status"` / `aria-live="polite"` region | [polite-status](tests/polite-status.spec.ts) |
-| Assertive error alert | `/live/alert` | 3.3.1, 3.3.3 | nothing | Error lands in a `role="alert"` region, not `aria-live="off"` | [assertive-error-alert](tests/assertive-error-alert.spec.ts) |
-| Auto-dismissing toast | `/live/toast` | 4.1.3 | nothing | Live region exists *before* the toast appears and isn't replaced | [toast](tests/toast.spec.ts) |
-| Loading indicator | `/live/loading` | 4.1.3 | `svg-img-alt` | "Loading" and "Loaded" announced through a live region, `aria-busy` toggles | [loading](tests/loading.spec.ts) |
-| Accordion | `/disclosure/accordion` | 2.1.1, 4.1.2 | nothing | Header is a button with `aria-expanded` and `aria-controls` | [accordion](tests/accordion.spec.ts) |
-| Modal dialog | `/disclosure/dialog` | 4.1.2, 2.4.3, 2.1.1 | `aria-dialog-name` | `aria-modal`, focus moves in, Tab is trapped, focus returns to the trigger | [dialog](tests/dialog.spec.ts) |
-| Tabs | `/disclosure/tabs` | 4.1.2, 2.1.1, 1.3.1, 2.4.7 | `aria-required-parent` | `aria-selected` moves to the clicked tab and its panel is a `tabpanel`. The broken tabs have no `tablist` and fail keyboard checks | [tabs](tests/tabs.spec.ts) |
-| Menu button | `/disclosure/menu` | 4.1.2, 2.1.1, 1.3.1 | `button-name` | `aria-expanded` → true and `hidden` removed (DOM). A `menu` with 4 `menuitem`s appears (tree) | [menu](tests/menu.spec.ts), [menu-aria-tree](tests/menu-aria-tree.spec.ts) |
-| Inline validation | `/forms/inline-validation` | 3.3.1, 1.4.1, 3.3.3, 1.3.1 | nothing | On blur: `aria-invalid` and `aria-describedby` point to the error | [inline-validation](tests/inline-validation.spec.ts) |
-| Error summary on submit | `/forms/error-summary` | 3.3.1, 2.4.3, 4.1.3 | nothing | Focus moves to the summary, inputs get `aria-invalid` plus a description | [error-summary](tests/error-summary.spec.ts) |
-| Labels, hints, required | `/forms/labels` | 1.3.1, 3.3.2, 4.1.2 | `label` | Accessible names, required state, and hint descriptions (single state, no interaction) | [labels](tests/labels.spec.ts) |
-| Submission confirmation | `/forms/success` | 4.1.3, 2.4.3, 3.2.2 | nothing | Confirmation in an existing `role="status"` region, focus not lost to `<body>` | [submission-confirmation](tests/submission-confirmation.spec.ts) |
-| Autocomplete combobox | `/dynamic/combobox` | 2.1.1 | `aria-required-parent`, `list` | Combobox/listbox roles, result count announced, keyboard selection | [combobox](tests/combobox.spec.ts) |
-| Delayed content injection | `/dynamic/delayed-content` | 4.1.3, 1.3.1, 2.4.6 | nothing | Loading/loaded status messages, real heading, named region, list items | [delayed-content](tests/delayed-content.spec.ts) |
-| Load more | `/dynamic/load-more` | 4.1.3, 2.4.3 | nothing | *Pending: [#147](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/147)* | |
-| Sortable table | `/dynamic/sortable-table` | 4.1.2, 1.3.1 | nothing | *Pending: [#141](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/141)* | |
+| Scenario                  | Route                      | WCAG                       | axe flags                      | What our tests check beyond axe                                                                                                    | Spec                                                                       |
+| ------------------------- | -------------------------- | -------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Polite status message     | `/live/polite`             | 4.1.3                      | nothing                        | Message lands in a `role="status"` / `aria-live="polite"` region                                                                   | [polite-status](tests/polite-status.spec.ts)                               |
+| Assertive error alert     | `/live/alert`              | 3.3.1, 3.3.3               | nothing                        | Error lands in a `role="alert"` region, not `aria-live="off"`                                                                      | [assertive-error-alert](tests/assertive-error-alert.spec.ts)               |
+| Auto-dismissing toast     | `/live/toast`              | 4.1.3                      | nothing                        | Live region exists _before_ the toast appears and isn't replaced                                                                   | [toast](tests/toast.spec.ts)                                               |
+| Loading indicator         | `/live/loading`            | 4.1.3                      | `svg-img-alt`                  | "Loading" and "Loaded" announced through a live region, `aria-busy` toggles                                                        | [loading](tests/loading.spec.ts)                                           |
+| Accordion                 | `/disclosure/accordion`    | 2.1.1, 4.1.2               | nothing                        | Header is a button with `aria-expanded` and `aria-controls`                                                                        | [accordion](tests/accordion.spec.ts)                                       |
+| Modal dialog              | `/disclosure/dialog`       | 4.1.2, 2.4.3, 2.1.1        | `aria-dialog-name`             | `aria-modal`, focus moves in, Tab is trapped, focus returns to the trigger                                                         | [dialog](tests/dialog.spec.ts)                                             |
+| Tabs                      | `/disclosure/tabs`         | 4.1.2, 2.1.1, 1.3.1, 2.4.7 | `aria-required-parent`         | `aria-selected` moves to the clicked tab and its panel is a `tabpanel`. The broken tabs have no `tablist` and fail keyboard checks | [tabs](tests/tabs.spec.ts)                                                 |
+| Menu button               | `/disclosure/menu`         | 4.1.2, 2.1.1, 1.3.1        | `button-name`                  | `aria-expanded` → true and `hidden` removed (DOM). A `menu` with 4 `menuitem`s appears (tree)                                      | [menu](tests/menu.spec.ts), [menu-aria-tree](tests/menu-aria-tree.spec.ts) |
+| Inline validation         | `/forms/inline-validation` | 3.3.1, 1.4.1, 3.3.3, 1.3.1 | nothing                        | On blur: `aria-invalid` and `aria-describedby` point to the error                                                                  | [inline-validation](tests/inline-validation.spec.ts)                       |
+| Error summary on submit   | `/forms/error-summary`     | 3.3.1, 2.4.3, 4.1.3        | nothing                        | Focus moves to the summary, inputs get `aria-invalid` plus a description                                                           | [error-summary](tests/error-summary.spec.ts)                               |
+| Labels, hints, required   | `/forms/labels`            | 1.3.1, 3.3.2, 4.1.2        | `label`                        | Accessible names, required state, and hint descriptions (single state, no interaction)                                             | [labels](tests/labels.spec.ts)                                             |
+| Submission confirmation   | `/forms/success`           | 4.1.3, 2.4.3, 3.2.2        | nothing                        | Confirmation in an existing `role="status"` region, focus not lost to `<body>`                                                     | [submission-confirmation](tests/submission-confirmation.spec.ts)           |
+| Autocomplete combobox     | `/dynamic/combobox`        | 2.1.1                      | `aria-required-parent`, `list` | Combobox/listbox roles, result count announced, keyboard selection                                                                 | [combobox](tests/combobox.spec.ts)                                         |
+| Delayed content injection | `/dynamic/delayed-content` | 4.1.3, 1.3.1, 2.4.6        | nothing                        | Loading/loaded status messages, real heading, named region, list items                                                             | [delayed-content](tests/delayed-content.spec.ts)                           |
+| Load more                 | `/dynamic/load-more`       | 4.1.3, 2.4.3               | nothing                        | _Pending: [#147](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/147)_                                          |                                                                            |
+| Sortable table            | `/dynamic/sortable-table`  | 4.1.2, 1.3.1               | nothing                        | _Pending: [#141](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/141)_                                          |                                                                            |
 
 The full results for each scenario, with before/after tables, are in [docs/scenarios.md](docs/scenarios.md).
 
