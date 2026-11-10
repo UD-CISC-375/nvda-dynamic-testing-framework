@@ -7,3 +7,6 @@ npm-debug.log*
 # Playwright output
 test-results/
 playwright-report/
+
+# Generated results from the Playwright reporter
+results/output/

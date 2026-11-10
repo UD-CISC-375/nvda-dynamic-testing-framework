@@ -61,31 +61,32 @@ class ResultsReporter implements Reporter {
       const dom = readAttachment(result.attachments, "dom-changes.json");
 
       const states: StateResult[] = [];
+      const beforeViolations = before ? toViolations(before) : [];
       if (before) {
-        const b = toViolations(before);
         states.push({
           index: 0, trigger: "Page loaded",
           domChangeSummary: "Baseline; no previous state.",
           treeDiff: emptyDiff(),
-          axe: { new: b, resolved: [], totalCount: b.length },
+          axe: { new: beforeViolations, resolved: [], totalCount: beforeViolations.length },
           stable: true,
         });
-        if (after) {
-          const a = toViolations(after);
-          const bKeys = new Set(b.map(keyOf));
-          const aKeys = new Set(a.map(keyOf));
-          states.push({
-            index: 1, trigger: "After the interaction",
-            domChangeSummary: dom?.summary ?? "No DOM change data recorded.",
-            treeDiff: dom?.treeDiff ?? emptyDiff(),
-            axe: {
-              new: a.filter((v) => !bKeys.has(keyOf(v))),
-              resolved: b.filter((v) => !aKeys.has(keyOf(v))),
-              totalCount: a.length,
-            },
-            stable: true,
-          });
-        }
+      }
+
+      if (after) {
+        const afterViolations = toViolations(after);
+        const beforeKeys = new Set(beforeViolations.map(keyOf));
+        const afterKeys = new Set(afterViolations.map(keyOf));
+        states.push({
+          index: 1, trigger: "After the interaction",
+          domChangeSummary: dom?.summary ?? "No DOM change data recorded.",
+          treeDiff: dom?.treeDiff ?? emptyDiff(),
+          axe: {
+            new: afterViolations.filter((v) => !beforeKeys.has(keyOf(v))),
+            resolved: beforeViolations.filter((v) => !afterKeys.has(keyOf(v))),
+            totalCount: afterViolations.length,
+          },
+          stable: true,
+        });
       }
 
       const base = {
