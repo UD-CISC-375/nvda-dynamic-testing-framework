@@ -76,12 +76,29 @@ Sending feedback changes the button to "Sending…", then shows a confirmation. 
 
 **axe can't detect this flaw** (manifest: `nvdaOnly: true`). The broken page is clean to axe, but a screen reader says nothing, and a keyboard user loses their place. Only checking the live region and `document.activeElement` catches it.
 
+## Delayed content injection: announcements and structure
+
+Team Y's delayed content scenario adds three recommendations automatically after a short delay. The tests use `?delay=3000` to check the loading state before the content appears.
+
+### What the results show
+
+| Variant | Status messages | Heading and region | List | axe |
+|---|---|---|---|---|
+| accessible | Announces loading and "3 recommendations loaded" | Real h2 heading and named region | 3 list items | 0 violations |
+| broken | No status messages | No real heading or named region | Plain div items | 0 violations |
+
+Both tests pass. The accessible version keeps the same status region while updating its message. The broken version adds content without announcing it to screen readers.
+
+**axe can't detect this flaw** (`nvdaOnly: true`). The tests check the status region and HTML structure directly.
+
+
 ### Files
 
 - `playwright.config.ts`: points Playwright at Team Y's site (`baseURL`) and defines the `chromium` (automatic) and `manual` projects.
 - `tests/menu.spec.ts`: the menu tests.
 - `tests/loading.spec.ts`: the loading indicator tests.
 - `tests/submission-confirmation.spec.ts`: the submission confirmation tests.
+- `tests/delayed-content.spec.ts`: checks loading messages, heading, region, list items, and axe-core results when recommendations appear automatically.
 - `tests/inline-validation.spec.ts`: checks blur-triggered error feedback for accessible and broken variants, including the live DOM changes and axe scans. The semantic WCAG checks are asserted directly because axe cannot infer whether an error message belongs to a field.
 - `tests/helpers/axe.ts`: `runAxe()` (scan + report attachment) and `diffViolations()` (violations that are new since the before scan).
 - `tests/helpers/watch-dom.ts`: `watchDom()`, a MutationObserver in the page that reports each change back to the test, and `waitFor()`, which waits until the change we expect has been recorded (or fails after a timeout, listing everything it saw).
