@@ -21,14 +21,14 @@ const validationReported = (changes: DomChange[]) =>
   changes.some(
     (change) =>
       change.type === "childList" &&
-      change.added.some((added) => added === "p" || added.startsWith("p#")),
+      change.added.some((added) => added === "p" || added.startsWith("p#") || added.startsWith("p[")),
   );
 
 const errorDisplayed = (changes: DomChange[]) =>
   changes.some(
     (change) =>
       change.type === "childList" &&
-      change.added.some((added) => added === "p" || added.startsWith("p#")),
+      change.added.some((added) => added === "p" || added.startsWith("p#") || added.startsWith("p[")),
   );
 
 const inlineValidationAxeTags = [
