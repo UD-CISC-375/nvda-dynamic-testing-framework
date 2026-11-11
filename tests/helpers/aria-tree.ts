@@ -7,18 +7,35 @@ export type TreeSnapshot = {
   content: string;
   // AI-mode snapshot: stable [ref=eN] ids and the [active] focus marker.
   refs: string;
+  // False if the page kept changing and snapshotTree ran out of retries, so content
+  // and refs may describe slightly different moments.
+  consistent: boolean;
 };
 
-// Capture the accessibility tree under `scope` in both modes.
+// How many times snapshotTree retries before giving up on a page that keeps changing.
+const MAX_SNAPSHOT_TRIES = 3;
+
+// Capture the accessibility tree under `scope` in both modes, from the same moment.
+// The two snapshots are separate browser calls, so the page can change in between.
+// Taking content again after refs catches that: if both content reads match, the page
+// didn't change (in a way default mode can see) while refs was being taken.
 export async function snapshotTree(scope: Locator): Promise<TreeSnapshot> {
-  // Take both snapshots in parallel so they're as close together in time as possible.
-  const [content, refs] = await Promise.all([
-    // Default mode: accurate content, no refs or focus.
-    scope.ariaSnapshot(),
+  // Default mode: accurate content, no refs or focus.
+  let content = await scope.ariaSnapshot();
+  for (let attempt = 1; ; attempt++) {
     // AI mode: refs and focus, but leaks aria-hidden text, so it isn't used for content.
-    scope.ariaSnapshot({ mode: "ai" }),
-  ]);
-  return { content, refs };
+    const refs = await scope.ariaSnapshot({ mode: "ai" });
+    // Default mode again, strictly after refs finished.
+    const contentAfter = await scope.ariaSnapshot();
+    // No change around the refs snapshot: the pair goes together.
+    if (contentAfter === content)
+      return { content: contentAfter, refs, consistent: true };
+    // Out of tries: return the latest pair, but say it may not match.
+    if (attempt >= MAX_SNAPSHOT_TRIES)
+      return { content: contentAfter, refs, consistent: false };
+    // The page changed mid-snapshot: start over from the newest content.
+    content = contentAfter;
+  }
 }
 
 // Turn a snapshot into one string that is compared between polls to detect change and settling.
