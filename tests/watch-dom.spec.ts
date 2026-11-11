@@ -160,3 +160,111 @@ test("a focus move made after a DOM change comes after it in changes", { tag: "@
   const focused = changes.findIndex((x) => x.type === "focus");
   expect(focused).toBeGreaterThan(replaced);
 });
+
+test("removing the focused element records a focusLost with it as oldValue", { tag: "@unit" }, async ({ page }) => {
+  await page.setContent(`<button id="send">Send</button>`);
+  const watcher = await watchDom(page);
+  await page.focus("#send");
+
+  // Removing the focused element sends focus back to <body>.
+  await page.evaluate(() => document.querySelector("#send")!.remove());
+
+  const changes = await watcher.waitFor((c) => c.some((x) => x.type === "focusLost"));
+  // Every field, so a stray attributeName or text can't slip into focusLost records.
+  expect(changes.filter((x) => x.type === "focusLost")).toEqual([
+    {
+      type: "focusLost",
+      target: "body",
+      attributeName: null,
+      oldValue: "button#send",
+      newValue: null,
+      added: [],
+      removed: [],
+      text: null,
+      inLiveRegion: false,
+    },
+  ]);
+});
+
+test("a focusLost comes right after the change that removed the element", { tag: "@unit" }, async ({ page }) => {
+  await page.setContent(`<button id="send">Send</button>`);
+  const watcher = await watchDom(page);
+  await page.focus("#send");
+
+  // Both in one task, so both records arrive in the same observer batch. The
+  // drop belongs between them, not after the whole batch.
+  await page.evaluate(() => {
+    document.querySelector("#send")!.remove();
+    const message = document.createElement("p");
+    message.id = "thanks";
+    document.body.append(message);
+  });
+
+  const changes = await watcher.waitFor((c) => c.some((x) => x.added.includes("p#thanks")));
+  const removed = changes.findIndex((x) => x.removed.includes("button#send"));
+  const lost = changes.findIndex((x) => x.type === "focusLost");
+  const added = changes.findIndex((x) => x.added.includes("p#thanks"));
+  expect(lost).toBe(removed + 1);
+  expect(added).toBe(lost + 1);
+});
+
+test("removing an ancestor of the focused element records a focusLost", { tag: "@unit" }, async ({ page }) => {
+  await page.setContent(`<form id="feedback"><button id="send">Send</button></form>`);
+  const watcher = await watchDom(page);
+  await page.focus("#send");
+
+  // The record names the form, but the focused button goes with it.
+  await page.evaluate(() => document.querySelector("#feedback")!.remove());
+
+  const changes = await watcher.waitFor((c) => c.some((x) => x.type === "focusLost"));
+  expect(changes.find((x) => x.type === "focusLost")?.oldValue).toBe("button#send");
+});
+
+test("removing an element that doesn't have focus records no focusLost", { tag: "@unit" }, async ({ page }) => {
+  await page.setContent(`<button id="one">One</button><button id="two">Two</button>`);
+  const watcher = await watchDom(page);
+  await page.focus("#one");
+
+  // Remove #two, then add a marker. A focusLost would be reported right after
+  // the removal, so once the marker arrives it would already be in the list.
+  await page.evaluate(() => {
+    document.querySelector("#two")!.remove();
+    document.body.append(document.createElement("hr"));
+  });
+
+  const changes = await watcher.waitFor((c) => c.some((x) => x.added.includes("hr")));
+  expect(changes.some((x) => x.type === "focusLost")).toBe(false);
+});
+
+test("an element focused before watchDom started is still caught when removed", { tag: "@unit" }, async ({ page }) => {
+  await page.setContent(`<button id="send">Send</button>`);
+  // Focus first, so no focusin fires while watching.
+  await page.focus("#send");
+  const watcher = await watchDom(page);
+
+  await page.evaluate(() => document.querySelector("#send")!.remove());
+
+  const changes = await watcher.waitFor((c) => c.some((x) => x.type === "focusLost"));
+  expect(changes.find((x) => x.type === "focusLost")?.oldValue).toBe("button#send");
+});
+
+test("clicking away to plain text, then removing the element, records no focusLost", { tag: "@unit" }, async ({ page }) => {
+  await page.setContent(`<button id="send">Send</button><p id="note">Plain text</p>`);
+  const watcher = await watchDom(page);
+  await page.focus("#send");
+
+  // A real click on text that can't take focus: focus goes to <body>, and no
+  // focusin fires anywhere. The user left the button; the page didn't take it.
+  await page.click("#note");
+  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+
+  // Remove the button, then add a marker. A focusLost would be reported right
+  // after the removal, so once the marker arrives it would already be in the list.
+  await page.evaluate(() => {
+    document.querySelector("#send")!.remove();
+    document.body.append(document.createElement("hr"));
+  });
+
+  const changes = await watcher.waitFor((c) => c.some((x) => x.added.includes("hr")));
+  expect(changes.some((x) => x.type === "focusLost")).toBe(false);
+});
