@@ -1,5 +1,5 @@
 
-import { test, expect, Page, TestInfo } from "@playwright/test";
+import { test, expect, Page } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
 
@@ -17,17 +17,8 @@ const announced = (text: string) => (changes: DomChange[]) =>
       change.inLiveRegion && change.text?.includes(text),
   );
 
-async function clickTrigger(page: Page, testInfo: TestInfo) {
-  if (testInfo.project.name === "manual") {
-    console.log(">>> Click 'Add to cart' in the browser <<<");
-
-    await expect(page.getByTestId("status")).toHaveText(
-      expectedMessage,
-      { timeout: testInfo.timeout },
-    );
-  } else {
-    await page.getByTestId("trigger").click();
-  }
+async function clickTrigger(page: Page) {
+  await page.getByTestId("trigger").click();
 }
 
 test("polite status page loads", async ({ page }) => {
@@ -54,7 +45,7 @@ test("accessible: polite status message uses a live region", async ({
   );
 
   // 3. Trigger the status message
-  await clickTrigger(page, testInfo);
+  await clickTrigger(page);
 
   // 4. Verify the message is updated in a live region
   const changes = await watcher.waitFor(
@@ -93,7 +84,7 @@ test("broken: status message is not exposed in a live region", async ({
   );
 
   // 3. Trigger the message
-  await clickTrigger(page, testInfo);
+  await clickTrigger(page);
 
   // 4. Message appears visually
   await expect(page.getByTestId("status")).toHaveText(

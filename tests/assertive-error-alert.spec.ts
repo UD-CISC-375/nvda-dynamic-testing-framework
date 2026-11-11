@@ -1,4 +1,4 @@
-import { test, expect, Page, TestInfo } from "@playwright/test";
+import { test, expect, Page } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
 
@@ -16,17 +16,8 @@ const announced = (text: string) => (changes: DomChange[]) =>
       change.text?.includes(text)
   );
 
-async function clickTrigger(page: Page, testInfo: TestInfo) {
-  if (testInfo.project.name === "manual") {
-    console.log(">>> Click 'Save changes' in the browser <<<");
-
-    await expect(page.getByTestId("error-text")).toHaveText(
-      expectedError,
-      { timeout: testInfo.timeout }
-    );
-  } else {
-    await page.getByTestId("trigger").click();
-  }
+async function clickTrigger(page: Page) {
+  await page.getByTestId("trigger").click();
 }
 
 
@@ -66,7 +57,7 @@ test("accessible: error is announced through an assertive alert", async ({
   );
 
   // trigger the simulated save failure
-  await clickTrigger(page, testInfo);
+  await clickTrigger(page);
 
   // verify the error was added inside a live region
   const changes = await watcher.waitFor(announced(expectedError));
@@ -114,7 +105,7 @@ test("broken: error is not announced through an assertive live region", async ({
   );
 
   // trigger the simulated save failure
-  await clickTrigger(page, testInfo);
+  await clickTrigger(page);
 
   // verify the error is visually displayed
   await expect(page.getByTestId("error-text"))

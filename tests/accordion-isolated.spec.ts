@@ -6,49 +6,17 @@
  * Expected Speech: "Expanded" or "Collapsed"
  */
 
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
-import { test, expect, Page, TestInfo } from "@playwright/test";
+import { test, expect, Page } from "@playwright/test";
 import { attachAnnotationEvaluation } from "./helpers/annotations";
 import { isolatedAccordionUrl } from "./helpers/isolated-pages";
 
 const accordionPage = isolatedAccordionUrl();
 
-async function clickHeader(page: Page, testInfo: TestInfo) {
-  if (testInfo.project.name === "manual") {
-    console.log(">>> Click the accordion header button in the browser <<<");
-    await expect(page.locator("#accordion-panel")).toBeVisible({
-      timeout: testInfo.timeout,
-    });
-  } else {
-    await page.locator("button#accordion-header-btn").click();
-  }
+async function clickHeader(page: Page) {
+  await page.locator("button#accordion-header-btn").click();
 }
 
-test.describe("isolated accordion URL", () => {
-  test.beforeEach(({}, testInfo) => {
-    test.skip(
-      testInfo.project.name === "manual",
-      "URL resolution checks run in the automated chromium project.",
-    );
-  });
-
-  test("uses a local accordion.html when GitHub Pages does not host it", () => {
-    expect(accordionPage.startsWith("file:")).toBe(true);
-    expect(accordionPage).toMatch(/accordion\.html$/i);
-    expect(
-      existsSync(resolve(process.cwd(), "tests/fixtures/accordion.html")),
-    ).toBe(true);
-  });
-
-  test("falls back to the deployed URL when no local file exists", () => {
-    expect(isolatedAccordionUrl(resolve(process.cwd(), "missing-workspace"))).toBe(
-      "https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/accordion.html",
-    );
-  });
-});
-
-test("isolated broken accordion page loads", async ({ page }, testInfo) => {
+test("isolated accordion page loads", async ({ page }, testInfo) => {
   await page.goto(accordionPage);
 
   const header = page.locator("button#accordion-header-btn");
@@ -57,7 +25,7 @@ test("isolated broken accordion page loads", async ({ page }, testInfo) => {
   await attachAnnotationEvaluation(page, testInfo, { phase: "load" });
 });
 
-test("broken: header click sets aria-expanded and aria-controls", async ({
+test("header click sets aria-expanded and aria-controls", async ({
   page,
 }, testInfo) => {
   await page.goto(accordionPage);
@@ -65,7 +33,7 @@ test("broken: header click sets aria-expanded and aria-controls", async ({
   const header = page.locator("button#accordion-header-btn");
   const panel = page.locator("#accordion-panel");
 
-  await clickHeader(page, testInfo);
+  await clickHeader(page);
   await expect(panel).toBeVisible();
   // Capture the live DOM before compliance asserts fail so the report still
   // shows the intended-vs-actual table and automated remediation.

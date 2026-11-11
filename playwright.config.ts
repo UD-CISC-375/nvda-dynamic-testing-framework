@@ -22,14 +22,6 @@ export default defineConfig({
     baseURL: 'https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/',
   },
   projects: [
-    // Default: Playwright clicks the menu button itself.
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    // Manual: a visible browser opens and a person clicks the menu button.
-    // Tests check testInfo.project.name to know which mode they're in.
-    {
-      name: 'manual',
-      use: { ...devices['Desktop Chrome'], headless: false },
-      timeout: 120_000, // per test; leaves time to find and click the button
-    },
   ],
 });

@@ -1,4 +1,4 @@
-import { test, expect, Page, TestInfo } from "@playwright/test";
+import { test, expect, Page } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
 
@@ -27,18 +27,8 @@ const busyCleared = (changes: DomChange[]) =>
       c.newValue === "false",
   );
 
-// Starts loading. In the "chromium" project Playwright clicks for us; in the
-// "manual" project we wait for a person to click in the visible browser.
-async function clickTrigger(page: Page, testInfo: TestInfo) {
-  if (testInfo.project.name === "manual") {
-    console.log(">>> Click the 'Load results' button in the browser window <<<");
-    // This only waits for the human. The watcher still does the detecting.
-    await expect(page.getByTestId("spinner")).toBeVisible({
-      timeout: testInfo.timeout,
-    });
-  } else {
-    await page.getByTestId("trigger").click();
-  }
+async function clickTrigger(page: Page) {
+  await page.getByTestId("trigger").click();
 }
 
 test("loading page loads", async ({ page }) => {
@@ -65,8 +55,7 @@ test("accessible: loading and completion are announced via a live region", async
   // 2. Start watching BEFORE the click so the change can't slip past us.
   const watcher = await watchDom(page, '[data-testid="scenario-root"]');
 
-  // 3. Start loading (automatically, or by a person in manual mode).
-  await clickTrigger(page, testInfo);
+  await clickTrigger(page);
 
   // 4. "Loading results…" is written into the role="status" region.
   await watcher.waitFor(loadingAnnounced);
@@ -99,7 +88,7 @@ test("broken: loading and completion are NOT announced", async ({
   expect(before.map((v) => v.id)).toEqual([]);
 
   const watcher = await watchDom(page, '[data-testid="scenario-root"]');
-  await clickTrigger(page, testInfo);
+  await clickTrigger(page);
 
   // The spinner is role="img" with no accessible name, so a screen reader
   // says "image" at best. axe reports that as svg-img-alt, but only while

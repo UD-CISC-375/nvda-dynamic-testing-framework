@@ -1,5 +1,4 @@
-// Import Playwright's test runner, assertion library, and the Page/TestInfo types.
-import { test, expect, Page, TestInfo } from "@playwright/test";
+import { test, expect, Page } from "@playwright/test";
 // Import the helpers that snapshot, diff, wait on, and attach accessibility trees.
 import { snapshotTree, diffTree, waitForTreeChange, attachTreeDiff } from "./helpers/aria-tree";
 
@@ -7,21 +6,8 @@ import { snapshotTree, diffTree, waitForTreeChange, attachTreeDiff } from "./hel
 // Build the hash route for the menu demo page, selecting the accessible or broken variant.
 const menuUrl = (variant: "accessible" | "broken") => `#/disclosure/menu?variant=${variant}`;
 
-// Open the menu: a human clicks in the "manual" project, otherwise Playwright clicks for us.
-async function clickTrigger(page: Page, testInfo: TestInfo) {
-  // Check whether this run is the manual (human-driven) Playwright project.
-  if (testInfo.project.name === "manual") {
-    // Tell the human tester what to do in the browser window.
-    console.log(">>> Click the menu button in the browser window <<<");
-    // Wait up to 90 seconds for the menu to appear after the human clicks.
-    await expect(page.getByTestId("menu")).toBeVisible({ timeout: 90_000 });
-  // Any non-manual project is automated.
-  } else {
-    // Click the menu's trigger button automatically.
-    await page.getByTestId("trigger").click();
-  // End of manual/automated branch.
-  }
-// End of clickTrigger.
+async function clickTrigger(page: Page) {
+  await page.getByTestId("trigger").click();
 }
 
 // Generate one test per variant so both the accessible and broken menus are checked.
@@ -38,8 +24,7 @@ for (const variant of ["accessible", "broken"] as const) {
 
     // Capture the accessibility tree before the menu is opened.
     const before = await snapshotTree(scope);
-    // Open the menu (manually or automatically depending on the project).
-    await clickTrigger(page, testInfo);
+    await clickTrigger(page);
     // Poll until the accessibility tree changes and settles, then capture it.
     const after = await waitForTreeChange(scope, before);
     // Compute which tree lines were added and removed by opening the menu.

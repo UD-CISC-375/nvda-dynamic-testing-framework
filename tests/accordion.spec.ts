@@ -1,4 +1,4 @@
-import { test, expect, Page, TestInfo } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
 import { attachAnnotationEvaluation } from "./helpers/annotations";
@@ -24,22 +24,6 @@ const accordionOpened = (changes: DomChange[]) =>
       c.attributeName === "hidden" &&
       c.newValue === null,
   );
-
-async function clickTrigger(page: Page, testInfo: TestInfo) {
-  if (testInfo.project.name === "manual") {
-    console.log(">>> Click the first accordion header in the browser window <<<");
-    await expect(page.getByTestId("accordion-panel-1")).toBeVisible({
-      timeout: testInfo.timeout,
-    });
-  } else {
-    const annotated = page.locator("button#acc-header-1");
-    if ((await annotated.count()) > 0) {
-      await annotated.click();
-    } else {
-      await page.getByTestId("trigger").click();
-    }
-  }
-}
 
 test("accordion page loads", async ({ page }, testInfo) => {
   await page.goto(accordionUrl("accessible"));
@@ -78,10 +62,9 @@ test("accessible: opening the accordion is detected and stays clean", async ({
   // 2. Start DOM watcher
   const watcher = await watchDom(page, ".accordion");
 
-  // 3. Trigger action
-  await clickTrigger(page, testInfo);
+  await trigger.click();
 
-  // 4. Wait for expected DOM mutation
+  // 3. Wait for expected DOM mutation
   const changes = await watcher.waitFor(accordionOpened);
   console.log("[dom] detected:", changes);
 
@@ -92,7 +75,7 @@ test("accessible: opening the accordion is detected and stays clean", async ({
   ).toBeVisible();
   await attachAnnotationEvaluation(page, testInfo, { phase: "after-trigger" });
 
-  // 5. Post-action scan
+  // 4. Post-action scan
   const after = await runAxe(page, testInfo, "after");
   expect(after.map((v) => v.id)).toEqual([]);
   expect(diffViolations(before, after)).toEqual([]);
@@ -107,7 +90,7 @@ test("broken: opening the accordion sets aria-expanded and aria-controls", async
   const trigger = page.getByTestId("trigger");
   await expect(trigger).toBeVisible();
 
-  await clickTrigger(page, testInfo);
+  await trigger.click();
   await expect(page.getByTestId("accordion-panel-1")).toBeVisible();
   // Capture the live DOM before compliance asserts fail so the report still
   // shows the intended-vs-actual table and automated remediation.

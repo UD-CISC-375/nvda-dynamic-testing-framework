@@ -552,6 +552,31 @@ export function toHtml(model: ReportModel): string {
       const remediationList = `<ul class="remediation-list">${test.remediationItems
         .map((item) => `<li data-kind="${escapeHtml(item.kind)}">${escapeHtml(item.message)}</li>`)
         .join("")}</ul>`;
+      const error = plainLogText(test.error);
+      const output = plainLogText(test.output);
+      const logs =
+        error || output
+          ? `<div class="card-logs" data-testid="test-logs-${index}">
+              ${
+                error
+                  ? disclosure(
+                      `error-${index}`,
+                      "Error / diff",
+                      `<pre><code>${escapeHtml(error)}</code></pre>`,
+                    )
+                  : ""
+              }
+              ${
+                output
+                  ? disclosure(
+                      `output-${index}`,
+                      "Output",
+                      `<pre><code>${escapeHtml(output)}</code></pre>`,
+                    )
+                  : ""
+              }
+            </div>`
+          : "";
       return `
         <article
           class="card status-${escapeHtml(test.status)}"
@@ -579,38 +604,7 @@ export function toHtml(model: ReportModel): string {
               ${remediationList}
             </section>
           </div>
-        </article>`;
-    })
-    .join("");
-
-  const logs = model.tests
-    .map((test, index) => {
-      const error = plainLogText(test.error);
-      const output = plainLogText(test.output);
-      if (!error && !output) {
-        return "";
-      }
-      return `
-        <article class="log-card" aria-labelledby="log-${index}-title">
-          <h3 id="log-${index}-title">${escapeHtml(test.title)}</h3>
-          ${
-            error
-              ? disclosure(
-                  `error-${index}`,
-                  "Error / diff",
-                  `<pre><code>${escapeHtml(error)}</code></pre>`,
-                )
-              : ""
-          }
-          ${
-            output
-              ? disclosure(
-                  `output-${index}`,
-                  "Output",
-                  `<pre><code>${escapeHtml(output)}</code></pre>`,
-                )
-              : ""
-          }
+          ${logs}
         </article>`;
     })
     .join("");
@@ -754,16 +748,8 @@ export function toHtml(model: ReportModel): string {
       color: var(--accent-text);
       background: var(--accent);
     }
-    .logs {
-      margin-top: 2rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--border);
-    }
-    .log-card {
-      margin: 1rem 0;
-      padding: 1rem;
-      border: 1px solid var(--border);
-      border-radius: 6px;
+    .card-logs {
+      margin-top: 1rem;
     }
     .card {
       margin: 1rem 0;
@@ -886,10 +872,6 @@ export function toHtml(model: ReportModel): string {
     >
       <h2 id="results-heading">Test results</h2>
       ${tests || "<p>No tests ran.</p>"}
-      <section class="logs" aria-labelledby="logs-heading" data-testid="error-diff-section">
-        <h2 id="logs-heading">Error and diff details</h2>
-        ${logs || "<p>No error or output logs.</p>"}
-      </section>
     </section>
     <section
       id="markdown-view"

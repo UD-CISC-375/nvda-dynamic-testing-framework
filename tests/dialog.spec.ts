@@ -1,4 +1,4 @@
-import { test, expect, Page, TestInfo } from "@playwright/test";
+import { test, expect, Page } from "@playwright/test";
 import { runAxe } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
 
@@ -17,16 +17,9 @@ const dialogAxeTags = [
   "best-practice",
 ];
 
-async function openDialog(page: Page, testInfo: TestInfo) {
-  if (testInfo.project.name === "manual") {
-    console.log(">>> Click the Open profile settings button in the browser window <<<");
-    await expect(page.getByTestId("dialog")).toBeVisible({
-      timeout: testInfo.timeout,
-    });
-  } else {
-    await page.getByTestId("trigger").focus();
-    await page.keyboard.press("Enter");
-  }
+async function openDialog(page: Page) {
+  await page.getByTestId("trigger").focus();
+  await page.keyboard.press("Enter");
 }
 
 test("dialog page loads closed", async ({ page }) => {
@@ -47,7 +40,7 @@ test("accessible: opening the dialog is detected, keyboard managed, and axe clea
   expect(before.map((violation) => violation.id)).toEqual([]);
 
   const watcher = await watchDom(page, ".scenario");
-  await openDialog(page, testInfo);
+  await openDialog(page);
 
   const changes = await watcher.waitFor(dialogInserted);
   console.log("[dom] detected dialog insertion:", changes);
@@ -80,7 +73,7 @@ test("broken: dialog insertion is detected but name and keyboard management are 
   expect(before.map((violation) => violation.id)).toEqual([]);
 
   const watcher = await watchDom(page, ".scenario");
-  await openDialog(page, testInfo);
+  await openDialog(page);
 
   const changes = await watcher.waitFor(dialogInserted);
   console.log("[dom] detected dialog insertion:", changes);

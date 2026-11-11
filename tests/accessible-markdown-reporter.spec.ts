@@ -15,13 +15,6 @@ import {
 import { captureAccessibleState } from "./helpers/annotations";
 import { isolatedAccordionUrl } from "./helpers/isolated-pages";
 
-test.beforeEach(({}, testInfo) => {
-  test.skip(
-    testInfo.project.name === "manual",
-    "Reporter checks run in the automated chromium project.",
-  );
-});
-
 const SAMPLE_SOURCE = `/**
  * Component Name: Accordion Section
  * Selector: #accordion-panel
@@ -382,7 +375,7 @@ test("html report includes dual-view toggle and accessible disclosure markup", (
   expect(html).toContain('aria-live="polite"');
   expect(html).toContain('aria-expanded="false"');
   expect(html).toContain("Test results");
-  expect(html).toContain("Error and diff details");
+  expect(html).not.toContain("Error and diff details");
   expect(html).toContain("<article");
   expect(html).toContain("<h2");
   expect(html).toContain("<h3");
@@ -396,12 +389,16 @@ test("html report includes dual-view toggle and accessible disclosure markup", (
   expect(html).toContain("Redundant alt text");
   const resultsAt = html.indexOf("Test results");
   const annotationsAt = html.indexOf("Developer annotations");
-  const errorSectionAt = html.indexOf("Error and diff details");
+  const failedCardAt = html.indexOf('data-testid="test-card-1"');
+  const failedCardEnd = html.indexOf("</article>", failedCardAt);
   const errorButtonAt = html.indexOf("Error / diff");
+  const passedCardAt = html.indexOf('data-testid="test-card-0"');
+  const passedCardEnd = html.indexOf("</article>", passedCardAt);
   expect(resultsAt).toBeGreaterThan(-1);
   expect(annotationsAt).toBeGreaterThan(resultsAt);
-  expect(errorSectionAt).toBeGreaterThan(annotationsAt);
-  expect(errorButtonAt).toBeGreaterThan(errorSectionAt);
+  expect(errorButtonAt).toBeGreaterThan(failedCardAt);
+  expect(errorButtonAt).toBeLessThan(failedCardEnd);
+  expect(html.slice(passedCardAt, passedCardEnd)).not.toContain("Error / diff");
 });
 
 test("dual-view toggle switches views and announces the change", async ({
@@ -457,7 +454,9 @@ test("collapsible sections update aria-expanded, aria-controls, and live text", 
 
   const annotations = page.getByRole("heading", { name: "Developer annotations" }).first();
   const remediation = page.getByRole("heading", { name: "Automated remediation" }).first();
-  const errorToggle = page.getByRole("button", { name: "Error / diff" });
+  const errorToggle = page
+    .getByTestId("test-card-1")
+    .getByRole("button", { name: "Error / diff" });
   const panelId = await errorToggle.getAttribute("aria-controls");
   expect(panelId).toBeTruthy();
   await expect(annotations).toBeVisible();
@@ -500,17 +499,22 @@ test("report source order and headings follow the visual layout", async ({
   expect(headings[1]).toBe("Test results");
   expect(headings).toContain("Developer annotations");
   expect(headings).toContain("Automated remediation");
-  expect(headings.indexOf("Error and diff details")).toBeGreaterThan(
-    headings.indexOf("Automated remediation"),
-  );
+  expect(headings).not.toContain("Error and diff details");
 
   const firstCard = page.getByTestId("test-card-0");
-  const errorSection = page.getByTestId("error-diff-section");
+  const failedCard = page.getByTestId("test-card-1");
+  const errorToggle = failedCard.getByRole("button", { name: "Error / diff" });
+  const remediation = failedCard.getByRole("heading", {
+    name: "Automated remediation",
+  });
   await expect(firstCard).toBeVisible();
-  await expect(errorSection).toBeVisible();
+  await expect(firstCard.getByRole("button", { name: "Error / diff" })).toHaveCount(0);
+  await expect(errorToggle).toBeVisible();
   const cardBox = await firstCard.boundingBox();
-  const errorBox = await errorSection.boundingBox();
+  const remediationBox = await remediation.boundingBox();
+  const errorBox = await errorToggle.boundingBox();
   expect(cardBox && errorBox && cardBox.y < errorBox.y).toBe(true);
+  expect(remediationBox && errorBox && remediationBox.y < errorBox.y).toBe(true);
 });
 
 test("keyboard focus moves through view tabs, test cards, then error blocks", async ({
@@ -527,7 +531,9 @@ test("keyboard focus moves through view tabs, test cards, then error blocks", as
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("test-card-1")).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Error / diff" })).toBeFocused();
+  await expect(
+    page.getByTestId("test-card-1").getByRole("button", { name: "Error / diff" }),
+  ).toBeFocused();
 });
 
 test("captures actual DOM attributes for annotation comparison", async ({
