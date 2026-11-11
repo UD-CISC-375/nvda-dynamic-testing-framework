@@ -9,6 +9,7 @@
         "scenario": "menu",
         "variant": "accessible",
         "verdict": "passed",
+        "nvdaOnly": true,
         "states": [
           {
             "index": 0,
@@ -25,8 +26,12 @@
           },
           {
             "index": 1,
-            "trigger": "Clicked the menu button",
+            "trigger": "Clicked button 'Actions'",
             "domChangeSummary": "The button's aria-expanded changed to true and the menu's hidden attribute was removed.",
+            "assistiveTechChanges": [
+              "Added: menu 'Actions' with 4 items",
+              "Changed: button 'Actions', expanded false to true"
+            ],
             "treeDiff": {
               "added": [
                 {
@@ -34,11 +39,26 @@
                   "index": 1,
                   "subtree": {
                     "id": "actions-menu",
-                    "properties": { "role": "list" },
+                    "properties": { "role": "menu", "name": "Actions" },
                     "children": [
                       {
                         "id": "menu-item-1",
-                        "properties": { "role": "listitem" },
+                        "properties": { "role": "menuitem", "name": "Overview" },
+                        "children": []
+                      },
+                      {
+                        "id": "menu-item-2",
+                        "properties": { "role": "menuitem", "name": "Edit" },
+                        "children": []
+                      },
+                      {
+                        "id": "menu-item-3",
+                        "properties": { "role": "menuitem", "name": "Duplicate" },
+                        "children": []
+                      },
+                      {
+                        "id": "menu-item-4",
+                        "properties": { "role": "menuitem", "name": "Delete" },
                         "children": []
                       }
                     ]
@@ -49,6 +69,8 @@
               "changed": [
                 {
                   "nodeId": "menu-button",
+                  "role": "button",
+                  "name": "Actions",
                   "properties": [
                     { "name": "expanded", "before": false, "after": true }
                   ]
@@ -65,6 +87,7 @@
         "scenario": "menu",
         "variant": "broken",
         "verdict": "failed",
+        "nvdaOnly": true,
         "states": [
           {
             "index": 0,
@@ -76,13 +99,32 @@
               "changed": [],
               "reordered": []
             },
-            "axe": { "new": [], "resolved": [], "totalCount": 1 },
+            "axe": {
+              "new": [
+                {
+                  "rule": "button-name",
+                  "target": ["[data-testid=\"trigger\"]"],
+                  "impact": "critical",
+                  "help": "Buttons must have discernible text",
+                  "helpUrl": "https://dequeuniversity.com/rules/axe/4.13/button-name",
+                  "failureSummary": "Fix any of the following:\n  Element does not have an accessible name",
+                  "html": "<button data-testid=\"trigger\" class=\"menu-button\"><svg aria-hidden=\"true\"><!-- icon --></svg></button>"
+                }
+              ],
+              "resolved": [],
+              "totalCount": 1
+            },
             "stable": true
           },
           {
             "index": 1,
-            "trigger": "Clicked the menu button",
+            "trigger": "Clicked button with no accessible name",
             "domChangeSummary": "The menu was inserted without an expanded state on the button.",
+            "assistiveTechChanges": [
+              "Added: list with 4 items",
+              "The button has no accessible name or expanded state.",
+              "The opened content is exposed as a list, not as a menu."
+            ],
             "treeDiff": {
               "added": [
                 {
@@ -94,7 +136,22 @@
                     "children": [
                       {
                         "id": "menu-item-1",
-                        "properties": { "role": "listitem" },
+                        "properties": { "role": "listitem", "name": "Overview" },
+                        "children": []
+                      },
+                      {
+                        "id": "menu-item-2",
+                        "properties": { "role": "listitem", "name": "Edit" },
+                        "children": []
+                      },
+                      {
+                        "id": "menu-item-3",
+                        "properties": { "role": "listitem", "name": "Duplicate" },
+                        "children": []
+                      },
+                      {
+                        "id": "menu-item-4",
+                        "properties": { "role": "listitem", "name": "Delete" },
                         "children": []
                       }
                     ]

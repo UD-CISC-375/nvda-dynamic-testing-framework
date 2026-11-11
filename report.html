@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Accessibility test results</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #17212b; background: #f5f7fa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; line-height: 1.55; }
+    a { color: #0645ad; text-decoration-thickness: .08em; text-underline-offset: .15em; }
+    a:hover { text-decoration-thickness: .15em; }
+    a:focus-visible, summary:focus-visible { outline: 3px solid #a34a00; outline-offset: 3px; }
+    header, main, footer { width: min(100% - 2rem, 72rem); margin-inline: auto; }
+    header { padding-block: 2rem 1rem; }
+    h1 { margin: 0; font-size: clamp(1.8rem, 4vw, 2.5rem); line-height: 1.15; }
+    .run-meta { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; color: #374151; }
+    main { padding-block: 1rem 3rem; }
+    .scenario { margin-block: 1.5rem; padding: 1.25rem; border: 1px solid #9aa8b5; border-radius: .6rem; background: #fff; }
+    .scenario > h2 { margin-top: 0; }
+    .verdict { padding: .8rem 1rem; border-left: .35rem solid #155e36; background: #edf7f0; font-size: 1.15rem; font-weight: 700; }
+    .verdict.failed { border-color: #9c1c1c; background: #fff0f0; }
+    .verdict.skipped { border-color: #6a4c00; background: #fff4df; }
+    .nvda-warning { margin-block: 1rem; padding: 1rem; border: 2px solid #7a3e00; border-radius: .35rem; background: #fff4df; }
+    .nvda-warning h3 { margin: 0 0 .25rem; }
+    .nvda-warning p { margin: 0; }
+    .state { margin: 1rem 0 0 1rem; padding: 1rem; border-left: .2rem solid #63758a; }
+    .state h3 { margin-top: 0; }
+    .trigger { font-size: 1.05rem; }
+    .change-summary, .finding-group { margin-block: 1rem; }
+    .finding-group { padding-top: .75rem; border-top: 1px solid #c5cdd5; }
+    .finding-group > h4 { margin: 0 0 .75rem; }
+    .finding { margin-block: .75rem; padding: 1rem; border: 1px solid #aeb8c2; border-radius: .35rem; background: #fbfcfe; }
+    .finding h4 { margin: 0; }
+    .finding-meta { color: #374151; }
+    .finding pre { overflow-wrap: anywhere; white-space: pre-wrap; padding: .75rem; border-radius: .25rem; background: #eef1f4; color: #17212b; }
+    .finding code, code { overflow-wrap: anywhere; }
+    .empty, .count, .stability, .total-count { color: #374151; }
+    details { margin-top: 2rem; padding: 1rem; border: 1px solid #7e8b98; border-radius: .4rem; background: #fff; }
+    summary { width: fit-content; cursor: pointer; font-weight: 700; }
+    details pre { max-height: 40rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+    footer { padding-block: 0 2rem; color: #374151; }
+    @media (max-width: 40rem) { .state { margin-left: .25rem; padding-inline: .75rem; } .scenario { padding: .9rem; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Accessibility test results</h1>
+    <div class="run-meta">
+      <p><strong>Run:</strong> <time>2026-01-01T00:00:00Z</time></p>
+      <p><strong>Commit:</strong> <code>0000000000000000000000000000000000000000</code></p>
+      <p><strong>Test site:</strong> <a href="https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/">https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/</a></p>
+    </div>
+  </header>
+  <main>
+    <h2>Results by scenario and variant</h2>
+    <article class="scenario" aria-labelledby="scenario-0-heading">
+    <h2 id="scenario-0-heading">menu — accessible</h2>
+    <p class="verdict passed">Recorded checks passed. No new axe violations after clicked button &#39;Actions&#39;; No axe violations remain at the end. Axe cannot assess NVDA-only behavior.</p>
+    <div class="nvda-warning">
+        <h3>Axe cannot detect this flaw</h3>
+        <p>This scenario includes an NVDA-only check. A clean axe result does not mean this behavior is accessible; review the assistive-technology changes and test assertions.</p>
+      </div>
+    <div class="timeline"><div class="state">
+    <h3 id="state-0-0-heading">State 0</h3>
+    <p class="trigger"><strong>Trigger:</strong> Page loaded with the menu closed</p>
+    <div class="change-summary">
+      <h4>What assistive technology can detect</h4>
+      <p class="empty">No accessibility-tree change recorded.</p>
+    </div>
+    <p class="stability">State stabilized</p>
+    <div class="finding-group">
+    <h4>Found at baseline <span class="count">(0)</span></h4>
+    <p class="empty">None recorded.</p>
+  </div>
+    <div class="finding-group">
+    <h4>Resolved violations <span class="count">(0)</span></h4>
+    <p class="empty">None recorded.</p>
+  </div>
+    <p class="total-count">Axe violations in this state: 0</p>
+  </div>
+<div class="state">
+    <h3 id="state-0-1-heading">State 1</h3>
+    <p class="trigger"><strong>Trigger:</strong> Clicked button &#39;Actions&#39;</p>
+    <div class="change-summary">
+      <h4>What assistive technology can detect</h4>
+      <ul><li>Added: menu &#39;Actions&#39; with 4 items</li><li>Changed: button &#39;Actions&#39;, expanded false to true</li></ul>
+    </div>
+    <p class="stability">State stabilized</p>
+    <div class="finding-group">
+    <h4>New violations <span class="count">(0)</span></h4>
+    <p class="empty">None recorded.</p>
+  </div>
+    <div class="finding-group">
+    <h4>Resolved violations <span class="count">(0)</span></h4>
+    <p class="empty">None recorded.</p>
+  </div>
+    <p class="total-count">Axe violations in this state: 0</p>
+  </div></div>
+  </article>
+<article class="scenario" aria-labelledby="scenario-1-heading">
+    <h2 id="scenario-1-heading">menu — broken</h2>
+    <p class="verdict failed">Accessibility failure detected. No new axe violations after clicked button with no accessible name; 1 axe violation remains at the end. Axe cannot assess NVDA-only behavior.</p>
+    <div class="nvda-warning">
+        <h3>Axe cannot detect this flaw</h3>
+        <p>This scenario includes an NVDA-only check. A clean axe result does not mean this behavior is accessible; review the assistive-technology changes and test assertions.</p>
+      </div>
+    <div class="timeline"><div class="state">
+    <h3 id="state-1-0-heading">State 0</h3>
+    <p class="trigger"><strong>Trigger:</strong> Page loaded with the menu closed</p>
+    <div class="change-summary">
+      <h4>What assistive technology can detect</h4>
+      <p class="empty">No accessibility-tree change recorded.</p>
+    </div>
+    <p class="stability">State stabilized</p>
+    <div class="finding-group">
+    <h4>Found at baseline <span class="count">(1)</span></h4>
+    <article class="finding">
+    <h4>button-name: Buttons must have discernible text</h4>
+    <p class="finding-meta">Found at baseline · critical impact <a href="https://dequeuniversity.com/rules/axe/4.13/button-name">Read the axe rule documentation</a></p>
+    <p><strong>Failure summary</strong></p>
+    <pre>Fix any of the following:
+  Element does not have an accessible name</pre>
+    <p><strong>Element HTML</strong></p>
+    <pre><code>&lt;button data-testid=&quot;trigger&quot; class=&quot;menu-button&quot;&gt;&lt;svg aria-hidden=&quot;true&quot;&gt;&lt;!-- icon --&gt;&lt;/svg&gt;&lt;/button&gt;</code></pre>
+    <p><strong>Target</strong>: <code>&quot;[data-testid=\&quot;trigger\&quot;]&quot;</code></p>
+  </article>
+  </div>
+    <div class="finding-group">
+    <h4>Resolved violations <span class="count">(0)</span></h4>
+    <p class="empty">None recorded.</p>
+  </div>
+    <p class="total-count">Axe violations in this state: 1</p>
+  </div>
+<div class="state">
+    <h3 id="state-1-1-heading">State 1</h3>
+    <p class="trigger"><strong>Trigger:</strong> Clicked button with no accessible name</p>
+    <div class="change-summary">
+      <h4>What assistive technology can detect</h4>
+      <ul><li>Added: menu &#39;Actions&#39; with 4 items</li><li>The &#39;Actions&#39; button&#39;s expanded state did not change.</li></ul>
+    </div>
+    <p class="stability">State stabilized</p>
+    <div class="finding-group">
+    <h4>New violations <span class="count">(0)</span></h4>
+    <p class="empty">None recorded.</p>
+  </div>
+    <div class="finding-group">
+    <h4>Resolved violations <span class="count">(0)</span></h4>
+    <p class="empty">None recorded.</p>
+  </div>
+    <p class="total-count">Axe violations in this state: 1</p>
+  </div></div>
+  </article>
+    <details>
+      <summary>Show raw results.json</summary>
+      <pre tabindex="0" aria-label="Raw results JSON"><code>{
+  &quot;schemaVersion&quot;: 0,
+  &quot;run&quot;: {
+    &quot;timestamp&quot;: &quot;2026-01-01T00:00:00Z&quot;,
+    &quot;commit&quot;: &quot;0000000000000000000000000000000000000000&quot;,
+    &quot;siteUrl&quot;: &quot;https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/&quot;,
+    &quot;scenarios&quot;: [
+      {
+        &quot;scenario&quot;: &quot;menu&quot;,
+        &quot;variant&quot;: &quot;accessible&quot;,
+        &quot;verdict&quot;: &quot;passed&quot;,
+        &quot;nvdaOnly&quot;: true,
+        &quot;states&quot;: [
+          {
+            &quot;index&quot;: 0,
+            &quot;trigger&quot;: &quot;Page loaded with the menu closed&quot;,
+            &quot;domChangeSummary&quot;: &quot;Baseline; no previous state.&quot;,
+            &quot;treeDiff&quot;: {
+              &quot;added&quot;: [],
+              &quot;removed&quot;: [],
+              &quot;changed&quot;: [],
+              &quot;reordered&quot;: []
+            },
+            &quot;axe&quot;: { &quot;new&quot;: [], &quot;resolved&quot;: [], &quot;totalCount&quot;: 0 },
+            &quot;stable&quot;: true
+          },
+          {
+            &quot;index&quot;: 1,
+            &quot;trigger&quot;: &quot;Clicked button &#39;Actions&#39;&quot;,
+            &quot;domChangeSummary&quot;: &quot;The button&#39;s aria-expanded changed to true and the menu&#39;s hidden attribute was removed.&quot;,
+            &quot;assistiveTechChanges&quot;: [
+              &quot;Added: menu &#39;Actions&#39; with 4 items&quot;,
+              &quot;Changed: button &#39;Actions&#39;, expanded false to true&quot;
+            ],
+            &quot;treeDiff&quot;: {
+              &quot;added&quot;: [
+                {
+                  &quot;parentId&quot;: &quot;menu-wrapper&quot;,
+                  &quot;index&quot;: 1,
+                  &quot;subtree&quot;: {
+                    &quot;id&quot;: &quot;actions-menu&quot;,
+                    &quot;properties&quot;: { &quot;role&quot;: &quot;menu&quot;, &quot;name&quot;: &quot;Actions&quot; },
+                    &quot;children&quot;: [
+                      {
+                        &quot;id&quot;: &quot;menu-item-1&quot;,
+                        &quot;properties&quot;: { &quot;role&quot;: &quot;menuitem&quot;, &quot;name&quot;: &quot;Overview&quot; },
+                        &quot;children&quot;: []
+                      },
+                      {
+                        &quot;id&quot;: &quot;menu-item-2&quot;,
+                        &quot;properties&quot;: { &quot;role&quot;: &quot;menuitem&quot;, &quot;name&quot;: &quot;Edit&quot; },
+                        &quot;children&quot;: []
+                      },
+                      {
+                        &quot;id&quot;: &quot;menu-item-3&quot;,
+                        &quot;properties&quot;: { &quot;role&quot;: &quot;menuitem&quot;, &quot;name&quot;: &quot;Duplicate&quot; },
+                        &quot;children&quot;: []
+                      },
+                      {
+                        &quot;id&quot;: &quot;menu-item-4&quot;,
+                        &quot;properties&quot;: { &quot;role&quot;: &quot;menuitem&quot;, &quot;name&quot;: &quot;Delete&quot; },
+                        &quot;children&quot;: []
+                      }
+                    ]
+                  }
+                }
+              ],
+              &quot;removed&quot;: [],
+              &quot;changed&quot;: [
+                {
+                  &quot;nodeId&quot;: &quot;menu-button&quot;,
+                  &quot;role&quot;: &quot;button&quot;,
+                  &quot;name&quot;: &quot;Actions&quot;,
+                  &quot;properties&quot;: [
+                    { &quot;name&quot;: &quot;expanded&quot;, &quot;before&quot;: false, &quot;after&quot;: true }
+                  ]
+                }
+              ],
+              &quot;reordered&quot;: []
+            },
+            &quot;axe&quot;: { &quot;new&quot;: [], &quot;resolved&quot;: [], &quot;totalCount&quot;: 0 },
+            &quot;stable&quot;: true
+          }
+        ]
+      },
+      {
+        &quot;scenario&quot;: &quot;menu&quot;,
+        &quot;variant&quot;: &quot;broken&quot;,
+        &quot;verdict&quot;: &quot;failed&quot;,
+        &quot;nvdaOnly&quot;: true,
+        &quot;states&quot;: [
+          {
+            &quot;index&quot;: 0,
+            &quot;trigger&quot;: &quot;Page loaded with the menu closed&quot;,
+            &quot;domChangeSummary&quot;: &quot;Baseline; no previous state.&quot;,
+            &quot;treeDiff&quot;: {
+              &quot;added&quot;: [],
+              &quot;removed&quot;: [],
+              &quot;changed&quot;: [],
+              &quot;reordered&quot;: []
+            },
+            &quot;axe&quot;: {
+              &quot;new&quot;: [
+                {
+                  &quot;rule&quot;: &quot;button-name&quot;,
+                  &quot;target&quot;: [&quot;[data-testid=\&quot;trigger\&quot;]&quot;],
+                  &quot;impact&quot;: &quot;critical&quot;,
+                  &quot;help&quot;: &quot;Buttons must have discernible text&quot;,
+                  &quot;helpUrl&quot;: &quot;https://dequeuniversity.com/rules/axe/4.13/button-name&quot;,
+                  &quot;failureSummary&quot;: &quot;Fix any of the following:\n  Element does not have an accessible name&quot;,
+                  &quot;html&quot;: &quot;&lt;button data-testid=\&quot;trigger\&quot; class=\&quot;menu-button\&quot;&gt;&lt;svg aria-hidden=\&quot;true\&quot;&gt;&lt;!-- icon --&gt;&lt;/svg&gt;&lt;/button&gt;&quot;
+                }
+              ],
+              &quot;resolved&quot;: [],
+              &quot;totalCount&quot;: 1
+            },
+            &quot;stable&quot;: true
+          },
+          {
+            &quot;index&quot;: 1,
+            &quot;trigger&quot;: &quot;Clicked button with no accessible name&quot;,
+            &quot;domChangeSummary&quot;: &quot;The menu was inserted without an expanded state on the button.&quot;,
+            &quot;assistiveTechChanges&quot;: [
+              &quot;Added: menu &#39;Actions&#39; with 4 items&quot;,
+              &quot;The &#39;Actions&#39; button&#39;s expanded state did not change.&quot;
+            ],
+            &quot;treeDiff&quot;: {
+              &quot;added&quot;: [
+                {
+                  &quot;parentId&quot;: &quot;menu-wrapper&quot;,
+                  &quot;index&quot;: 1,
+                  &quot;subtree&quot;: {
+                    &quot;id&quot;: &quot;actions-menu&quot;,
+                    &quot;properties&quot;: { &quot;role&quot;: &quot;menu&quot;, &quot;name&quot;: &quot;Actions&quot; },
+                    &quot;children&quot;: [
+                      {
+                        &quot;id&quot;: &quot;menu-item-1&quot;,
+                        &quot;properties&quot;: { &quot;role&quot;: &quot;menuitem&quot;, &quot;name&quot;: &quot;Overview&quot; },
+                        &quot;children&quot;: []
+                      },
+                      {
+                        &quot;id&quot;: &quot;menu-item-2&quot;,
+                        &quot;properties&quot;: { &quot;role&quot;: &quot;menuitem&quot;, &quot;name&quot;: &quot;Edit&quot; },
+                        &quot;children&quot;: []
+                      },
+                      {
+                        &quot;id&quot;: &quot;menu-item-3&quot;,
+                        &quot;properties&quot;: { &quot;role&quot;: &quot;menuitem&quot;, &quot;name&quot;: &quot;Duplicate&quot; },
+                        &quot;children&quot;: []
+                      },
+                      {
+                        &quot;id&quot;: &quot;menu-item-4&quot;,
+                        &quot;properties&quot;: { &quot;role&quot;: &quot;menuitem&quot;, &quot;name&quot;: &quot;Delete&quot; },
+                        &quot;children&quot;: []
+                      }
+                    ]
+                  }
+                }
+              ],
+              &quot;removed&quot;: [],
+              &quot;changed&quot;: [],
+              &quot;reordered&quot;: []
+            },
+            &quot;axe&quot;: { &quot;new&quot;: [], &quot;resolved&quot;: [], &quot;totalCount&quot;: 1 },
+            &quot;stable&quot;: true
+          }
+        ]
+      }
+    ]
+  }
+}
+</code></pre>
+    </details>
+  </main>
+  <footer><p>Generated from results.json. This report is a test aid, not a substitute for testing with assistive technology.</p></footer>
+</body>
+</html>

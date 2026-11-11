@@ -2,6 +2,8 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 // Import the helpers that snapshot, diff, wait on, and attach accessibility trees.
 import { snapshotTree, diffTree, waitForTreeChange, attachTreeDiff } from "./helpers/aria-tree";
+import { runAxe } from "./helpers/axe";
+import { attachMenuResult, captureMenuSnapshot } from "./helpers/menu-results";
 
 // Duplicated from menu.spec.ts on purpose; importing from a spec file would register its tests.
 // Build the hash route for the menu demo page, selecting the accessible or broken variant.
@@ -27,7 +29,9 @@ async function clickTrigger(page: Page, testInfo: TestInfo) {
 // Generate one test per variant so both the accessible and broken menus are checked.
 for (const variant of ["accessible", "broken"] as const) {
   // Define a test whose name includes the variant; receives the page fixture and test metadata.
-  test(`${variant}: accessibility-tree diff detects the menu opening`, async ({ page }, testInfo) => {
+  test(`${variant}: accessibility-tree diff detects the menu opening`, {
+    annotation: { type: "accessibility-scenario", description: `menu:${variant}` },
+  }, async ({ page }, testInfo) => {
     // Navigate to the menu demo page for this variant.
     await page.goto(menuUrl(variant));
     // Make sure the trigger button has rendered before taking any snapshot.
@@ -36,6 +40,10 @@ for (const variant of ["accessible", "broken"] as const) {
     // Snapshot the whole page rather than just the menu.
     const scope = page.locator("body"); // whole page: the diff should still contain only menu lines
 
+    // Record the same states used by this test so the report describes observed results.
+    const trigger = page.getByTestId("trigger");
+    const beforeAxe = await runAxe(page, testInfo, "report-before");
+    const beforeResult = await captureMenuSnapshot(trigger, beforeAxe);
     // Capture the accessibility tree before the menu is opened.
     const before = await snapshotTree(scope);
     // Open the menu (manually or automatically depending on the project).
@@ -44,6 +52,9 @@ for (const variant of ["accessible", "broken"] as const) {
     const after = await waitForTreeChange(scope, before);
     // Compute which tree lines were added and removed by opening the menu.
     const diff = diffTree(before, after);
+    const afterAxe = await runAxe(page, testInfo, "report-after");
+    const afterResult = await captureMenuSnapshot(trigger, afterAxe);
+    await attachMenuResult(testInfo, variant, beforeResult, afterResult, page.getByTestId("menu"));
 
     // Log the full before and after trees for debugging.
     console.log(`[tree ${variant}] BEFORE\n${before}\n[tree ${variant}] AFTER\n${after}`);

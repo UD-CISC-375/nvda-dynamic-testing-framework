@@ -1,0 +1,991 @@
+{
+  "schemaVersion": 0,
+  "run": {
+    "timestamp": "2026-11-10T01:00:20.619Z",
+    "commit": "b8af2e1ab658d7db21b7f296ce79c228d1163bfa",
+    "siteUrl": "https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/",
+    "scenarios": [
+      {
+        "scenario": "dialog",
+        "variant": "n/a",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "assertive-error-alert",
+        "variant": "n/a",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "accordion",
+        "variant": "n/a",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "combobox",
+        "variant": "accessible",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "dialog",
+        "variant": "accessible",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "accordion",
+        "variant": "accessible",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "combobox",
+        "variant": "broken",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "assertive-error-alert",
+        "variant": "accessible",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "dialog",
+        "variant": "broken",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [
+                {
+                  "rule": "aria-dialog-name",
+                  "target": [
+                    ".dialog"
+                  ]
+                }
+              ],
+              "resolved": [],
+              "totalCount": 1
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "error-summary",
+        "variant": "accessible",
+        "states": [
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "inline-validation",
+        "variant": "n/a",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "error-summary",
+        "variant": "broken",
+        "states": [
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "accordion",
+        "variant": "broken",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "inline-validation",
+        "variant": "accessible",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "labels",
+        "variant": "accessible",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "loading",
+        "variant": "n/a",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "assertive-error-alert",
+        "variant": "broken",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "labels",
+        "variant": "broken",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "menu",
+        "variant": "n/a",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "inline-validation",
+        "variant": "broken",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "menu-aria-tree",
+        "variant": "accessible",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "polite-status",
+        "variant": "n/a",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "menu-aria-tree",
+        "variant": "broken",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "menu",
+        "variant": "accessible",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "loading",
+        "variant": "accessible",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "polite-status",
+        "variant": "accessible",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "menu",
+        "variant": "broken",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [
+                {
+                  "rule": "button-name",
+                  "target": [
+                    ".icon-btn"
+                  ]
+                }
+              ],
+              "resolved": [],
+              "totalCount": 1
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 1
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "polite-status",
+        "variant": "broken",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "report",
+        "variant": "accessible",
+        "states": [],
+        "verdict": "failed"
+      },
+      {
+        "scenario": "tabs",
+        "variant": "n/a",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "toast",
+        "variant": "n/a",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "loading",
+        "variant": "broken",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "watch-dom",
+        "variant": "n/a",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "tabs",
+        "variant": "accessible",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "watch-dom",
+        "variant": "n/a",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "watch-dom",
+        "variant": "n/a",
+        "states": [],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "submission-confirmation",
+        "variant": "accessible",
+        "states": [
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "tabs",
+        "variant": "broken",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [
+                {
+                  "rule": "aria-required-parent",
+                  "target": [
+                    "div[data-active=\"true\"]"
+                  ]
+                },
+                {
+                  "rule": "aria-required-parent",
+                  "target": [
+                    "div[data-testid=\"tab-security\"]"
+                  ]
+                },
+                {
+                  "rule": "aria-required-parent",
+                  "target": [
+                    "div[data-testid=\"tab-billing\"]"
+                  ]
+                }
+              ],
+              "resolved": [],
+              "totalCount": 3
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 3
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "submission-confirmation",
+        "variant": "broken",
+        "states": [
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "toast",
+        "variant": "accessible",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      },
+      {
+        "scenario": "toast",
+        "variant": "broken",
+        "states": [
+          {
+            "index": 0,
+            "trigger": "Page loaded",
+            "domChangeSummary": "Baseline; no previous state.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          },
+          {
+            "index": 1,
+            "trigger": "After the interaction",
+            "domChangeSummary": "No DOM change data recorded.",
+            "treeDiff": {
+              "added": [],
+              "removed": [],
+              "changed": [],
+              "reordered": []
+            },
+            "axe": {
+              "new": [],
+              "resolved": [],
+              "totalCount": 0
+            },
+            "stable": true
+          }
+        ],
+        "verdict": "passed"
+      }
+    ]
+  }
+}

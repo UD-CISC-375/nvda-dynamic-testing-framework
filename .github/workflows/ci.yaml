@@ -49,7 +49,21 @@ jobs:
       - name: Run Playwright tests
         env:
           BASE_URL: http://127.0.0.1:4173/nvda-dynamic-testing-webpage/
+          ACCESSIBILITY_RESULTS_PATH: test-results/accessibility-results.json
         run: npm test
+
+      - name: Generate offline results report
+        if: always()
+        run: npm run report:html -- test-results/accessibility-results.json results-report.html
+
+      - name: Upload offline results report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-results-report
+          path: results-report.html
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Upload Playwright report
         if: always()

@@ -47,6 +47,29 @@ The tests assert these outcomes, so `npm test` passes when the broken variant fa
 
 Note that **axe reports nothing new after the broken menu opens**. axe has no way to know the button should announce "expanded". Only the DOM watcher catches that the screen reader is never told the state changed. A scan before and after on its own is not enough. We also need to check that the right kind of change happened.
 
+## Generate an offline results report
+
+Generate a single HTML file from a `results.json` file:
+
+```sh
+npm run report:html -- results.json report.html
+```
+
+The report is self-contained: open `report.html` directly from disk or from a CI artifact; it does not need a web server or network access. It puts the verdict for each scenario and variant first, then shows the state timeline, accessibility-tree changes, and new/resolved axe findings. The full source JSON is available in a collapsed disclosure at the bottom.
+
+To record and generate a report from a test run:
+
+```sh
+ACCESSIBILITY_RESULTS_PATH=test-results/accessibility-results.json npm test
+npm run report:html -- test-results/accessibility-results.json results-report.html
+```
+
+CI publishes `offline-results-report` using results from its test run. Currently only the menu accessibility-tree tests record structured results; other scenarios are not represented in that report. A test that cannot record its states is shown as skipped with a reason, not as accessible. `examples/results.json` remains available for testing the renderer.
+
+For complete findings, each entry in `axe.new` and `axe.resolved` must include the axe `rule`, `target`, `help`, HTTPS `helpUrl`, `failureSummary`, and `html` fields; the generator rejects incomplete findings. The initial state's `axe.new` contains findings present in the baseline scan. Set `nvdaOnly: true` on scenarios with behavior axe cannot assess; the report will show a warning even when axe is clean. Accessibility-tree change records may include `role` and `name` so the report can describe changes in terms developers and screen-reader users recognize. A state may also provide `assistiveTechChanges` with concise plain-language descriptions when a diff alone cannot explain the user impact.
+
+The menu's initial state is marked "Stability not recorded": only the changed accessibility tree is polled until stable. The menu verdict checks the observed button name, expanded state, menu role, four items, and axe findings; it is separate from whether the Playwright test passed as expected.
+
 ## Error summary on submit
 
 The second scenario is Team Y's form error summary:
@@ -92,4 +115,3 @@ Sending feedback changes the button to "Sending…", then shows a confirmation. 
   - Not recorded: focus moving outside the watched root, focus dropped to `<body>` when the focused element is removed (no focus event fires for that), and focus inside iframes or shadow DOM.
   - One watcher per page: calling `watchDom` twice on the same page throws.
 - `tests/watch-dom.spec.ts`: unit tests for `watchDom()`, tagged `@unit`. They build their own pages with `page.setContent`, so they don't need Team Y's site. Run them alone with `npx playwright test --grep @unit --project=chromium`.
-

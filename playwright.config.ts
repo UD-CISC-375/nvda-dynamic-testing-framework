@@ -10,7 +10,13 @@ export default defineConfig({
   // Locally the report opens in the browser when the run ends (Ctrl+C in the
   // terminal stops the report server). On CI nobody is there to look or press
   // Ctrl+C, so it stays closed.
-  reporter: [['list'], ['html', { open: isCI ? 'never' : 'always' }]],
+  reporter: [
+    ['list'],
+    ['html', { open: isCI ? 'never' : 'always' }],
+    ...(process.env.ACCESSIBILITY_RESULTS_PATH
+      ? [['./tests/helpers/results-reporter.ts'] as [string]]
+      : []),
+  ],
   use: {
     trace: isCI ? 'on-first-retry' : 'off',
     // Team Y's site. Tests call page.goto('#/...') and Playwright prepends this.
