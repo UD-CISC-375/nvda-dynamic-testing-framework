@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 # Runs this repo's Playwright tests against the site, then serves the HTML
-# report. Used by compose.yaml; the build context is this repo, either your
-# local copy or a branch that Docker clones from GitHub.
+# report. Used by compose.yaml in the nvda-dynamic-testing-devtools repo; the
+# build context is this repo, either your local copy or a branch that Docker
+# clones from GitHub.
 
 # Microsoft's image ships the browsers for one Playwright version, so this must
 # match @playwright/test in package-lock.json. The build stops if it doesn't.
@@ -30,7 +31,7 @@ COPY . .
 # site (webServer) from a site-root folder that doesn't exist in this image.
 # This wrapper keeps every other setting from playwright.config.ts, tests the
 # site at BASE_URL instead (the webpage container by default, see
-# compose.yaml), and turns webServer off.
+# compose.yaml in the devtools repo), and turns webServer off.
 # ---------------------------------------------------------------------------
 COPY <<'EOF' playwright.docker.config.ts
 import { defineConfig } from '@playwright/test';
