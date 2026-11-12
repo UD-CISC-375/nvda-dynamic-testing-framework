@@ -44,7 +44,7 @@ export type TreeChange = ChangeBase &
       }
     | {
         kind: "reordered";
-        // For each child matched in place, in after order: its index in the before order.
+        // For each stayed child, in after order: its index among the stayed children in before order.
         order: number[];
       }
     | {
