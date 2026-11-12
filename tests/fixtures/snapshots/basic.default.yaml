@@ -1,0 +1,18 @@
+- main:
+  - heading "Say \"hi\" \\ now" [level=2]
+  - paragraph: Plain bold text
+  - link "About us":
+    - /url: /about
+  - button "Actions"
+  - button "Open" [expanded]
+  - text: Email
+  - textbox "Email": a@b.c
+  - checkbox "Agree" [checked]
+  - text: Agree
+  - list:
+    - listitem: one
+    - listitem:
+      - text: two
+      - link "link":
+        - /url: "#x"
+  - iframe
