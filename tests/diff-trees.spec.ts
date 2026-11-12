@@ -374,6 +374,30 @@ test.describe("diffTrees: known problems", () => {
     });
     expect(diffTrees(before.tree, after.tree)).toEqual([]);
   });
+
+  // Known diffTrees bug (X2.3, not fixed yet): nodes without a ref are matched by keyed(), whose
+  // key is role + name + position among ref-free siblings with the same role and name. Inserting
+  // one at the front shifts every later key by one, so each old node pairs with its new left
+  // neighbour. Today this reports textChanged "one" -> "new" at [1], textChanged "two" -> "one"
+  // at [2] and added at [3], instead of one added at [1]; #129 would then call a real addition
+  // recorded instead of meaningful.
+  // Change test.fixme back to test once this is fixed. See #169.
+  test.fixme("a ref-free sibling inserted at the front is reported as added, not as shifted text", () => {
+    // Before: two listitems with the same role and name and no refs.
+    const before = parseSnapshot({
+      content: `- list:\n  - listitem "Row": one\n  - listitem "Row": two`,
+      refs: `- list [ref=e1]:\n  - listitem "Row": one\n  - listitem "Row": two`,
+    });
+    // After: a third one with the same role and name is inserted at the front.
+    const after = parseSnapshot({
+      content: `- list:\n  - listitem "Row": new\n  - listitem "Row": one\n  - listitem "Row": two`,
+      refs: `- list [ref=e1]:\n  - listitem "Row": new\n  - listitem "Row": one\n  - listitem "Row": two`,
+    });
+    // Only the new first item is a change; "one" and "two" are untouched.
+    expect(diffTrees(before.tree, after.tree)).toEqual([
+      { kind: "added", path: 'list > listitem "Row"[1]', node: after.tree[0].children[0] },
+    ]);
+  });
 });
 
 // Parse one captured snapshot pair from tests/fixtures/snapshots. These were recorded from
