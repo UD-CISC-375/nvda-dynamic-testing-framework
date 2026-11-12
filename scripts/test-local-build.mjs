@@ -49,6 +49,7 @@ try {
     env: {
       ...process.env,
       BASE_URL: "http://127.0.0.1:4173/nvda-dynamic-testing-webpage/",
+      LOCAL_BUILD: "1",
       CI: "1",
     },
   });

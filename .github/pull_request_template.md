@@ -22,3 +22,7 @@ The use of Large Language Models (LLM's) and generative AI is permitted but all 
 - [ ] Docs updated if behavior changed
 - [ ] No unrelated changes included
 - [ ] Follow-up work filed as issues and linked above (or none needed)
+- [ ] CI Passes
+- [ ] Any new helper file is justified in the description
+- [ ] No test.fail()
+- [ ] A new spec has a row in the README's scenario table
