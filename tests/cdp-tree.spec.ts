@@ -1,20 +1,15 @@
 // Unit tests for normalizeAXTree/getCdpTree (#135). Most of these need no
-// browser at all: they feed hand-built or saved-JSON Accessibility.getFullAXTree
-// `nodes` arrays straight into normalizeAXTree. The one live test at the
-// bottom checks getCdpTree's fetchMs against a real page, since that's not
-// something a saved fixture can demonstrate.
+// browser at all: they feed hand-built Accessibility.getFullAXTree `nodes`
+// arrays straight into normalizeAXTree. The "live site" block at the bottom
+// hits the real, pinned Chromium build directly instead of saved JSON
+// fixtures (per team review: a committed fixture file was by far the
+// biggest share of this PR's diff, for little benefit over just running
+// against the site — this code barely has a reason to run without a
+// browser). If one of those live tests starts failing, check whether Team
+// Y's site changed recently before assuming this code regressed.
 import { test, expect } from "@playwright/test";
-import { readFileSync } from "fs";
-import { join } from "path";
 import { normalizeAXTree, getCdpTree, AXNode, IgnoredNode } from "./helpers/cdp-tree";
-import { createCdpLink } from "./helpers/cdp-link";
-
-// Reads a fixture captured by capture-cdp-fixtures.spec.ts (CAPTURE=1). If
-// you're seeing ENOENT here, that capture hasn't been run yet in this
-// checkout — see that file's header for the command.
-function fixture(file: string): { nodes: AXNode[]; meta: { scopeBackendNodeId?: number } } {
-  return JSON.parse(readFileSync(join(__dirname, "fixtures", "cdp", file), "utf8"));
-}
+import { createCdpLink, resolveElement } from "./helpers/cdp-link";
 
 // Shorthand for building a minimal AXNode by hand, for tests that need exact
 // control rather than a real capture. Only the fields a test cares about
@@ -174,10 +169,25 @@ test.describe("getCdpTree: unavailable link", () => {
   });
 });
 
-test.describe("getCdpTree: real captured fixtures", () => {
-  test("the dialog's background becomes ignored once showModal() is called", { tag: "@unit" }, () => {
-    const closed = normalizeAXTree(fixture("dialog-closed.json").nodes);
-    const open = normalizeAXTree(fixture("dialog-open.json").nodes);
+// Not @unit: these hit the real, pinned Chromium build against the live
+// site, in place of the saved-JSON fixtures the first version of this PR
+// used (see this file's header). Nothing here is cached to a fixture file,
+// so there's nothing that can go stale against a site change — that's the
+// whole point of the switch.
+test.describe("getCdpTree: live site", () => {
+  test("the dialog's background becomes ignored once showModal() is called", async ({ page }) => {
+    await page.goto("#/disclosure/dialog?variant=accessible&delay=0");
+    await page.getByTestId("trigger").waitFor();
+    const link = await createCdpLink(page);
+    const closed = await getCdpTree(link);
+
+    // Same open sequence as dialog.spec.ts's openDialog(): focus the
+    // trigger, then Enter.
+    await page.getByTestId("trigger").focus();
+    await page.keyboard.press("Enter");
+    await page.getByRole("dialog", { name: "Profile settings" }).waitFor();
+    const open = await getCdpTree(link);
+
     // The closed page can already have some ignored nodes of its own (e.g.
     // decorative content) — this isn't 0 in practice. What showModal() adds
     // is a genuinely NEW batch of ignored nodes for the background, so the
@@ -185,10 +195,13 @@ test.describe("getCdpTree: real captured fixtures", () => {
     expect(open.ignored.size).toBeGreaterThan(closed.ignored.size);
   });
 
-  test("with the menu's scenario-root as root, no node outside it is returned", { tag: "@unit" }, () => {
-    const { nodes, meta } = fixture("menu-accessible.json");
-    expect(meta.scopeBackendNodeId).toBeDefined();
-    const { tree } = normalizeAXTree(nodes, { root: meta.scopeBackendNodeId });
+  test("with the menu's scenario-root as root, no node outside it is returned", async ({ page }) => {
+    await page.goto("#/disclosure/menu?variant=accessible");
+    await page.getByTestId("trigger").click();
+    await page.getByRole("menu").waitFor();
+    const link = await createCdpLink(page);
+    const root = await resolveElement(link, page.getByTestId("scenario-root"));
+    const { tree } = await getCdpTree(link, { root });
     expect(tree).toHaveLength(1);
     // The scenario has page chrome (a page title, instructions, etc.)
     // outside the menu; none of it should be reachable from this tree.
@@ -201,21 +214,28 @@ test.describe("getCdpTree: real captured fixtures", () => {
     expect(roles.has("heading")).toBe(false);
   });
 
-  test("the broken menu's fixture still normalizes without throwing", { tag: "@unit" }, () => {
-    const { tree } = normalizeAXTree(fixture("menu-broken.json").nodes);
+  test("the broken menu variant still normalizes without throwing", async ({ page }) => {
+    await page.goto("#/disclosure/menu?variant=broken");
+    await page.getByTestId("trigger").click();
+    // The broken variant exposes a plain list instead of a menu (that's the
+    // point — see menu-aria-tree.spec.ts), so wait on that instead of role
+    // "menu", which this variant never gets.
+    await page.getByRole("list").waitFor();
+    const link = await createCdpLink(page);
+    const { tree } = await getCdpTree(link);
     expect(tree.length).toBeGreaterThan(0);
   });
-});
 
-// Not @unit: hits the real site, to prove fetchMs reflects an actual CDP
-// round trip rather than always being 0 or a hardcoded value. A real round
-// trip should never be negative or missing, but it's plausible for a very
-// fast local one to round to 0ms, so this doesn't assert > 0.
-test("getCdpTree reports a non-negative fetch time from a real page", async ({ page }) => {
-  await page.goto(`#/disclosure/menu?variant=accessible`);
-  await page.getByTestId("trigger").waitFor();
-  const link = await createCdpLink(page);
-  const result = await getCdpTree(link);
-  expect(result.fetchMs).toBeGreaterThanOrEqual(0);
-  expect(result.tree.length).toBeGreaterThan(0);
+  // Proves fetchMs reflects an actual CDP round trip rather than always
+  // being 0 or a hardcoded value. A real round trip should never be
+  // negative or missing, but it's plausible for a very fast local one to
+  // round to 0ms, so this doesn't assert > 0.
+  test("reports a non-negative fetch time", async ({ page }) => {
+    await page.goto(`#/disclosure/menu?variant=accessible`);
+    await page.getByTestId("trigger").waitFor();
+    const link = await createCdpLink(page);
+    const result = await getCdpTree(link);
+    expect(result.fetchMs).toBeGreaterThanOrEqual(0);
+    expect(result.tree.length).toBeGreaterThan(0);
+  });
 });
