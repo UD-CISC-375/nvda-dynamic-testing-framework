@@ -53,6 +53,18 @@ npm test
 
 By default the tests run against the [live test site](https://ud-cisc-375.github.io/nvda-dynamic-testing-webpage/). Set `BASE_URL` to point them at another copy, for example a local build.
 
+| Command                                               | What it does                                                                                                                                                                                       |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm test`                                            | Runs the whole suite headless. Playwright performs every click itself                                                                                                                              |
+| `npm run test:headed`                                 | Same, with a visible browser                                                                                                                                                                       |
+| `npm run test:manual`                                 | Opens a browser and waits for **you** to do the interaction (click the menu button, and so on). Supported by the menu, accordion, dialog, loading, toast, polite status, and assertive alert tests |
+| `npx playwright test --grep @unit --project=chromium` | Only the `watchDom` unit tests. These build their own pages and don't need the test site                                                                                                           |
+| `npm run type-check`                                  | TypeScript check with no output files                                                                                                                                                              |
+| `npm run test:local-build`                            | Does what CI does: clones and builds the test site, serves it locally, then type-checks and tests                                                                                                  |
+| `npx playwright show-report`                          | Reopens the HTML report from the last run                                                                                                                                                          |
+
+The HTML report opens automatically after a local run. Press Ctrl+C to stop the report server. Each test attaches its evidence to the report: the axe results (`axe-before.json`, `axe-after.json`), the accessibility trees and their diff (`tree-*.yaml`, `tree-*-diff.json`), and the logged DOM changes (`stdout`).
+
 ### Manifest-Driven Accessibility Tests
 
 The framework includes a generated test runner that reads scenario
