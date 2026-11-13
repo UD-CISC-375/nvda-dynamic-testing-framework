@@ -1,0 +1,28 @@
+- table "Employees":
+  - caption: Employees
+  - rowgroup:
+    - row "Name Department Start date":
+      - columnheader "Name":
+        - button "Name"
+      - columnheader "Department":
+        - button "Department"
+      - columnheader "Start date":
+        - button "Start date"
+  - rowgroup:
+    - row "Ada Lovelace Engineering 2018-01-15":
+      - cell "Ada Lovelace"
+      - cell "Engineering"
+      - cell "2018-01-15"
+    - row "Alan Turing Research 2021-07-01":
+      - cell "Alan Turing"
+      - cell "Research"
+      - cell "2021-07-01"
+    - row "Grace Hopper Engineering 2019-03-11":
+      - cell "Grace Hopper"
+      - cell "Engineering"
+      - cell "2019-03-11"
+    - row "Katherine Johnson Operations 2020-10-05":
+      - cell "Katherine Johnson"
+      - cell "Operations"
+      - cell "2020-10-05"
+- status: Sorted by Name, ascending
