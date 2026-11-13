@@ -67,8 +67,12 @@ The HTML report opens automatically after a local run. Press Ctrl+C to stop the 
 
 ### Manifest-Driven Accessibility Tests
 
+<<<<<<< HEAD
 The framework includes a generated test runner that reads scenario
 data from Team Y's `scenarios.json` manifest.
+=======
+The framework includes a generated test runner that reads scenario data from Team Y's `scenarios.json` manifest.
+>>>>>>> 0faccaa (pulled new README and added new info to it)
 
 The runner automatically creates tests for both the accessible and broken variants of each scenario. It executes the setup steps defined in the manifest and runs axe-core accessibility checks.
 
@@ -146,6 +150,7 @@ tests/
     axe.ts             runAxe() and diffViolations()
     scenarios.ts       loadScenarios(): reads the test site's scenarios.json
   *.spec.ts            one spec per scenario, plus unit tests for the helpers
+    generated-scenarios.spec.mts   generates axe tests from scenarios.json
   fixtures/            standalone HTML pages used by tests
 results/schema.ts      draft results.json contract (schemaVersion 0)
 examples/results.json  example of that contract
