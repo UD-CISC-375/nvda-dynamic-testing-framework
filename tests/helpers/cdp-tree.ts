@@ -82,7 +82,7 @@ export type AXNode = {
   ignored: boolean;
   ignoredReasons?: AXProperty[];
   role?: AXValue;
-  name?: AXValue & { sources?: { type: string; superseded?: boolean; invalid?: boolean }[] };
+  name?: AXValue & { sources?: { type: string; value?: AXvalue; superseded?: boolean; invalid?: boolean }[] };
   description?: AXValue;
   properties?: AXProperty[];
   childIds?: string[];
@@ -115,7 +115,7 @@ function nameOf(node: AXNode): string | undefined {
 // First non-superseded, non-invalid name source's type, if CDP reported any
 // — see CdpTreeNode.nameFrom's doc comment for the caveat on this field.
 function nameFromOf(node: AXNode): string | undefined {
-  return node.name?.sources?.find((s) => !s.superseded && !s.invalid)?.type;
+  return node.name?.sources?.find((s) => s.value !== undefined && !s.superseded && !s.invalid)?.type;
 }
 
 function propsOf(node: AXNode): Record<string, unknown> {
