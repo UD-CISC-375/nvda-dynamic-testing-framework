@@ -82,7 +82,7 @@ export type AXNode = {
   ignored: boolean;
   ignoredReasons?: AXProperty[];
   role?: AXValue;
-  name?: AXValue & { sources?: { type: string; value?: AXvalue; superseded?: boolean; invalid?: boolean }[] };
+  name?: AXValue & { sources?: { type: string; value?: AXValue; superseded?: boolean; invalid?: boolean }[] };
   description?: AXValue;
   properties?: AXProperty[];
   childIds?: string[];
