@@ -1,9 +1,10 @@
 import type { CdpLink } from "./cdp-link";
 
 /**
- * One kept node of the normalized CDP accessibility tree (see#135). This is
+ * One kept node of the normalized CDP accessibility tree (see #135). This is
  * Chromium's own tree, read through Accessibility.getFullAXTree, not
- * Playwright's ariaSnapshot — 
+ * Playwright's ariaSnapshot — see docs/how-it-works.md's Design choices for
+ * why both exist.
  */
 export type CdpTreeNode = {
   backendNodeId: number;
@@ -20,10 +21,13 @@ export type CdpTreeNode = {
   props: Record<string, unknown>;
   // Where the accessible name came from (e.g. "attribute", "contents",
   // "relatedElement", "placeholder") — the first entry in the node's
-  // name.sources that has a value and isn't superseded or invalid, when CDP
-  // reports one. Best-effort: this
-  // isn't a field CDP returns directly, so verify it against a real capture
-  // (see tests/capture-cdp-fixtures.spec.ts) before relying on exact values.
+  // name.sources that actually carries a value and isn't superseded or
+  // invalid (CDP lists every candidate source it considered, valueless ones
+  // included -- confirmed by Ariel's review on #168: a `relatedElement`
+  // source with no actual related element sitting ahead of `contents`, the
+  // one that really produced the name). Best-effort: this isn't a field CDP
+  // returns directly, so verify it against a real capture (see
+  // tests/capture-cdp-fixtures.spec.ts) before relying on exact values.
   nameFrom?: string;
   children: CdpTreeNode[];
 };
@@ -83,6 +87,11 @@ export type AXNode = {
   ignored: boolean;
   ignoredReasons?: AXProperty[];
   role?: AXValue;
+  // `value` added per Ariel's review on #168: a source can be a
+  // non-superseded, non-invalid CANDIDATE without having actually
+  // contributed a value (see CdpTreeNode.nameFrom's doc comment above) --
+  // nameFromOf needs this field to tell "considered but didn't apply" apart
+  // from "this is the one that won".
   name?: AXValue & { sources?: { type: string; value?: AXValue; superseded?: boolean; invalid?: boolean }[] };
   description?: AXValue;
   properties?: AXProperty[];
@@ -113,12 +122,12 @@ function nameOf(node: AXNode): string | undefined {
   return value ? value : undefined;
 }
 
-// First name source's type that actually supplied a value and isn't
-// superseded or invalid, if CDP reported any (CDP lists every candidate
-// source, valueless ones included)
-// — see CdpTreeNode.nameFrom's doc comment for the caveat on this field.
+// First entry in the node's name.sources that actually carries a value and
+// isn't superseded or invalid, if CDP reported any (CDP lists every
+// candidate source it considered, valueless ones included) -- see
+// CdpTreeNode.nameFrom's doc comment for the caveat on this field.
 function nameFromOf(node: AXNode): string | undefined {
-  return node.name?.sources?.find((s) => s.value !== undefined && !s.superseded && !s.invalid)?.type;
+  return node.name?.sources?.find((s) => !s.superseded && !s.invalid && unwrap(s.value) !== undefined)?.type;
 }
 
 function propsOf(node: AXNode): Record<string, unknown> {

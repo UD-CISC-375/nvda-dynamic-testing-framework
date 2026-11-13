@@ -144,11 +144,12 @@ test.describe("normalizeAXTree: props and nameFrom", () => {
         name: {
           value: "Email",
           sources: [
-            // CDP lists every candidate source; ones that didn't supply a
-            // name have no value and must be skipped.
-            { type: "relatedElement" },
-            { type: "placeholder", value: { value: "you@example.com" }, invalid: true },
-            { type: "attribute", value: { value: "Email" } },
+
+          // CDP lists every candidate source; ones that didn't supply a
+          // name have no value and must be skipped.
+          { type: "relatedElement" },
+          { type: "placeholder", value: { value: "you@example.com" }, invalid: true },
+          { type: "attribute", value: { value: "Email" } },
           ],
         },
         properties: [
@@ -162,6 +163,52 @@ test.describe("normalizeAXTree: props and nameFrom", () => {
       nameFrom: "attribute",
       props: { required: true, invalid: "false" },
     });
+  });
+
+  // Caught by Ariel's review on #168 (PR for #135/X3.2): the "Reset
+  // scenario" button's real sources list a `relatedElement` candidate ahead
+  // of `contents`, the one that actually produced the name. `relatedElement`
+  // is neither superseded nor invalid -- CDP still lists it as a considered
+  // candidate -- but it has no `value` of its own, because there's no actual
+  // related element to pull a name from. The old nameFromOf picked it anyway
+  // just for being first; this is the regression test for the fix.
+  test("skips a non-superseded, non-invalid source that has no value of its own", { tag: "@unit" }, () => {
+    const { tree } = normalizeAXTree([
+      node({
+        nodeId: "root",
+        role: { value: "button" },
+        name: {
+          value: "Reset",
+          sources: [
+            { type: "relatedElement" }, // considered, not ruled out, but no related element -- no value
+            { type: "contents", value: { value: "Reset" } }, // the one that actually won
+          ],
+        },
+        backendDOMNodeId: 1,
+      }),
+    ]);
+    expect(tree[0].nameFrom).toBe("contents");
+  });
+
+  // The flip side: superseded/invalid flags still rule a source out even
+  // when it does carry a value -- this fix only adds a second condition, it
+  // doesn't remove the first.
+  test("still skips a source marked superseded or invalid, even if it has a value", { tag: "@unit" }, () => {
+    const { tree } = normalizeAXTree([
+      node({
+        nodeId: "root",
+        role: { value: "button" },
+        name: {
+          value: "Reset",
+          sources: [
+            { type: "placeholder", value: { value: "Reset" }, superseded: true },
+            { type: "contents", value: { value: "Reset" } },
+          ],
+        },
+        backendDOMNodeId: 1,
+      }),
+    ]);
+    expect(tree[0].nameFrom).toBe("contents");
   });
 });
 
