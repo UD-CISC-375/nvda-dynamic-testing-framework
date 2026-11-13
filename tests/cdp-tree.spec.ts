@@ -144,8 +144,11 @@ test.describe("normalizeAXTree: props and nameFrom", () => {
         name: {
           value: "Email",
           sources: [
-            { type: "relatedElement", invalid: true },
-            { type: "attribute" },
+            // CDP lists every candidate source; ones that didn't supply a
+            // name have no value and must be skipped.
+            { type: "relatedElement" },
+            { type: "placeholder", value: { value: "you@example.com" }, invalid: true },
+            { type: "attribute", value: { value: "Email" } },
           ],
         },
         properties: [

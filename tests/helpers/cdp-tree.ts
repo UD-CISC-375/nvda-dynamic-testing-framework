@@ -19,8 +19,9 @@ export type CdpTreeNode = {
   // didn't anticipate it.
   props: Record<string, unknown>;
   // Where the accessible name came from (e.g. "attribute", "contents",
-  // "relatedElement", "placeholder") — the first non-superseded, non-invalid
-  // entry in the node's name.sources, when CDP reports one. Best-effort: this
+  // "relatedElement", "placeholder") — the first entry in the node's
+  // name.sources that has a value and isn't superseded or invalid, when CDP
+  // reports one. Best-effort: this
   // isn't a field CDP returns directly, so verify it against a real capture
   // (see tests/capture-cdp-fixtures.spec.ts) before relying on exact values.
   nameFrom?: string;
@@ -112,7 +113,9 @@ function nameOf(node: AXNode): string | undefined {
   return value ? value : undefined;
 }
 
-// First non-superseded, non-invalid name source's type, if CDP reported any
+// First name source's type that actually supplied a value and isn't
+// superseded or invalid, if CDP reported any (CDP lists every candidate
+// source, valueless ones included)
 // — see CdpTreeNode.nameFrom's doc comment for the caveat on this field.
 function nameFromOf(node: AXNode): string | undefined {
   return node.name?.sources?.find((s) => s.value !== undefined && !s.superseded && !s.invalid)?.type;
