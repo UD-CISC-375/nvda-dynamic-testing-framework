@@ -133,6 +133,66 @@ test.describe("normalizeAXTree: root scoping", () => {
   test("an unknown root backendNodeId returns an empty tree rather than throwing", { tag: "@unit" }, () => {
     expect(normalizeAXTree(nodes, { root: 9999 }).tree).toEqual([]);
   });
+
+  // Caught by Ariel's review on #168, found live: the root used to be
+  // hand-built into the tree unconditionally, skipping the same
+  // noise/unnamed-generic/ignored classification every other node goes
+  // through -- so a root that happened to itself be one of those cases was
+  // still counted as a real node, one more than a scope-free walk over the
+  // same content would ever produce ("6 nodes when they should be 5").
+  // These three cover the three classification paths collectChildren
+  // applies to every other node, now applied to the root too.
+  test("a root that is itself an unnamed generic wrapper is not forced into the tree -- its child is promoted instead", { tag: "@unit" }, () => {
+    const { tree } = normalizeAXTree(
+      [
+        // No name at all: anywhere else in the tree this would be flattened,
+        // not kept as a node of its own -- the root used to be exempted.
+        node({ nodeId: "wrapper", role: { value: "generic" }, childIds: ["button"], backendDOMNodeId: 5 }),
+        node({ nodeId: "button", role: { value: "button" }, name: { value: "Go" }, backendDOMNodeId: 6 }),
+      ],
+      { root: 5 },
+    );
+    // One node (the button), not two (wrapper + button).
+    expect(tree).toHaveLength(1);
+    expect(tree[0]).toMatchObject({ backendNodeId: 6, role: "button", name: "Go" });
+  });
+
+  test("a root with a noise role is dropped the same as anywhere else in the tree", { tag: "@unit" }, () => {
+    const { tree } = normalizeAXTree(
+      [
+        node({ nodeId: "presentation", role: { value: "none" }, childIds: ["heading"], backendDOMNodeId: 7 }),
+        node({ nodeId: "heading", role: { value: "heading" }, name: { value: "Title" }, backendDOMNodeId: 8 }),
+      ],
+      { root: 7 },
+    );
+    expect(tree).toHaveLength(1);
+    expect(tree[0]).toMatchObject({ backendNodeId: 8, role: "heading", name: "Title" });
+  });
+
+  test("a root CDP marks ignored is recorded in `ignored`, not forced into the tree", { tag: "@unit" }, () => {
+    const { tree, ignored } = normalizeAXTree(
+      [
+        node({
+          nodeId: "hidden",
+          role: { value: "generic" },
+          name: { value: "Hidden root" },
+          ignored: true,
+          ignoredReasons: [{ name: "notRendered" }],
+          childIds: ["child"],
+          backendDOMNodeId: 9,
+        }),
+        node({ nodeId: "child", role: { value: "button" }, name: { value: "Still here" }, backendDOMNodeId: 10 }),
+      ],
+      { root: 9 },
+    );
+    // The ignored root itself doesn't appear in `tree` -- only its
+    // non-ignored child does, same promotion collectChildren already gives
+    // an ignored node anywhere else (see "normalizeAXTree: ignored nodes").
+    expect(tree).toHaveLength(1);
+    expect(tree[0]).toMatchObject({ backendNodeId: 10, role: "button", name: "Still here" });
+    const expected: IgnoredNode = { backendNodeId: 9, role: "generic", reasons: ["notRendered"] };
+    expect(ignored.get(9)).toEqual(expected);
+  });
 });
 
 test.describe("normalizeAXTree: props and nameFrom", () => {
@@ -144,12 +204,12 @@ test.describe("normalizeAXTree: props and nameFrom", () => {
         name: {
           value: "Email",
           sources: [
-
-          // CDP lists every candidate source; ones that didn't supply a
-          // name have no value and must be skipped.
-          { type: "relatedElement" },
-          { type: "placeholder", value: { value: "you@example.com" }, invalid: true },
-          { type: "attribute", value: { value: "Email" } },
+            { type: "relatedElement", invalid: true },
+            // A real winning source carries the value it contributed, not
+            // just a type -- see the regression test below for the case
+            // where a source is neither superseded nor invalid, but still
+            // didn't win because it has no value of its own.
+            { type: "attribute", value: { value: "Email" } },
           ],
         },
         properties: [
@@ -252,9 +312,25 @@ test.describe("getCdpTree: live site", () => {
     const link = await createCdpLink(page);
     const root = await resolveElement(link, page.getByTestId("scenario-root"));
     const { tree } = await getCdpTree(link, { root });
-    expect(tree).toHaveLength(1);
+    // Not toHaveLength(1): that was asserting the root-node bug's own side
+    // effect (the root was always force-wrapped as exactly one node), not
+    // this test's real intent. Confirmed live by this exact scenario:
+    // scenario-root itself has no AX role of its own (an unnamed generic
+    // wrapper), so once it goes through the same classification as every
+    // other node (see normalizeAXTree's doc comment), its own real children
+    // -- the trigger button, the opened menu, a status live region -- are
+    // correctly promoted to the top level instead of being hidden under one
+    // fake wrapper node. A sane scope can have more than one top-level node;
+    // what actually matters is that none of them, at any depth, reach
+    // outside the subtree the caller asked for.
+    expect(tree.length).toBeGreaterThan(0);
     // The scenario has page chrome (a page title, instructions, etc.)
     // outside the menu; none of it should be reachable from this tree.
+    // tree.forEach below walks every TOP-LEVEL node this call returned (not
+    // just tree[0]) and all of their descendants, so this already verifies
+    // "every returned node belongs to the requested subtree" regardless of
+    // how many top-level nodes there are -- that was never actually tied to
+    // the node count the removed toHaveLength(1) assumed.
     const roles = new Set<string>();
     const collect = (n: (typeof tree)[number]) => {
       roles.add(n.role);

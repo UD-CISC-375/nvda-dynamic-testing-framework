@@ -218,6 +218,17 @@ function collectChildren(
  * description), so the node whose backendDOMNodeId matches `root` is used
  * as the sole starting point instead of the page's actual root. Without
  * `root`, the whole document is kept.
+ *
+ * The root node itself goes through the exact same noise/unnamed-generic/
+ * ignored classification collectChildren gives every other node -- it is
+ * NOT forced into the tree just for being the element the caller asked to
+ * resolve (confirmed by Ariel's review on #168, found live: a root that
+ * happened to itself be e.g. an unnamed generic wrapper was still kept as a
+ * literal node, over-counting the tree by one against what a scope-free walk
+ * over the same content would produce). If the root turns out to be noise or
+ * an unnamed generic, its children are promoted in its place, same as any
+ * other wrapper; if CDP marks it `ignored`, it's recorded in `ignored` and
+ * left out of `tree`, same as any other ignored node.
  */
 export function normalizeAXTree(
   nodes: AXNode[],
@@ -227,26 +238,13 @@ export function normalizeAXTree(
   const byId = new Map(nodes.map((n) => [n.nodeId, n]));
 
   if (options.root !== undefined) {
-    // Find the node standing for `root`, and build its subtree directly —
-    // never its parent's children, so nothing outside the subtree returns.
+    // Find the node standing for `root`, then build its subtree by treating
+    // it as collectChildren's sole "child" -- never its real parent's other
+    // children, so nothing outside the subtree returns, but otherwise
+    // exactly the same classification path every other node goes through.
     const rootNode = nodes.find((n) => n.backendDOMNodeId === options.root);
     if (!rootNode) return { tree: [], ignored };
-    // The root itself is never noise/generic/ignored-away: it's exactly the
-    // element the caller asked to resolve into a tree, by its CDP identity.
-    return {
-      tree: [
-        {
-          backendNodeId: rootNode.backendDOMNodeId!,
-          role: roleOf(rootNode),
-          name: nameOf(rootNode),
-          description: unwrap(rootNode.description) as string | undefined,
-          props: propsOf(rootNode),
-          nameFrom: nameFromOf(rootNode),
-          children: collectChildren(rootNode.childIds, byId, ignored),
-        },
-      ],
-      ignored,
-    };
+    return { tree: collectChildren([rootNode.nodeId], byId, ignored), ignored };
   }
 
   // No root given: start from the document's own root (the one node with no
