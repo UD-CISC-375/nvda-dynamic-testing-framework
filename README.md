@@ -65,6 +65,34 @@ By default the tests run against the [live test site](https://ud-cisc-375.github
 
 The HTML report opens automatically after a local run. Press Ctrl+C to stop the report server. Each test attaches its evidence to the report: the axe results (`axe-before.json`, `axe-after.json`), the accessibility trees and their diff (`tree-*.yaml`, `tree-*-diff.json`), and the logged DOM changes (`stdout`).
 
+### Manifest-Driven Accessibility Tests
+
+<<<<<<< HEAD
+The framework includes a generated test runner that reads scenario
+data from Team Y's `scenarios.json` manifest.
+=======
+The framework includes a generated test runner that reads scenario data from Team Y's `scenarios.json` manifest.
+>>>>>>> 0faccaa (pulled new README and added new info to it)
+
+The runner automatically creates tests for both the accessible and broken variants of each scenario. It executes the setup steps defined in the manifest and runs axe-core accessibility checks.
+
+- Accessible variants must have no axe violations.
+- Broken variants must contain every expected rule listed in
+  `brokenRules`.
+- Scenarios marked `nvdaOnly` are skipped with the reason
+  "needs a screen reader check", since axe alone cannot
+  verify their accessibility issues.
+
+New scenarios added to the manifest automatically receive generated tests without requiring framework code changes.
+
+To run the generated tests:
+
+```bash
+npx playwright test tests/generated-scenarios.spec.mts --project=chromium
+```
+
+These tests assist the existing scenario-specific tests which perform additional checks for keyboard navigation, focus management, and DOM changes.
+
 ## How it works
 
 ```
@@ -122,6 +150,7 @@ tests/
     axe.ts             runAxe() and diffViolations()
     scenarios.ts       loadScenarios(): reads the test site's scenarios.json
   *.spec.ts            one spec per scenario, plus unit tests for the helpers
+    generated-scenarios.spec.mts   generates axe tests from scenarios.json
   fixtures/            standalone HTML pages used by tests
 results/schema.ts      draft results.json contract (schemaVersion 0)
 examples/results.json  example of that contract
