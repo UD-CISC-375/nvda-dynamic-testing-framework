@@ -1,0 +1,8 @@
+# Not copied into the Docker build (see Dockerfile).
+.git
+node_modules
+playwright-report
+test-results
+# Created by npm run test:local-build and by CI
+site-root
+nvda-dynamic-testing-webpage
