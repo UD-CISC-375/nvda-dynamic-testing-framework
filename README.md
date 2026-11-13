@@ -36,6 +36,31 @@ The HTML report opens in your browser automatically when a run finishes (press C
 - `axe-before.json` and `axe-after.json`: the full axe results (violations, passes, incomplete) for each scan.
 - `stdout`: what the test logged, including the DOM changes the observer recorded.
 
+
+### Manifest-Driven Accessibility Tests
+
+The framework includes a generated test runner that reads scenario
+data from Team Y's `scenarios.json` manifest.
+
+The runner automatically creates tests for both the accessible and broken variants of each scenario. It executes the setup steps defined in the manifest and runs axe-core accessibility checks.
+
+- Accessible variants must have no axe violations.
+- Broken variants must contain every expected rule listed in
+  `brokenRules`.
+- Scenarios marked `nvdaOnly` are skipped with the reason
+  "needs a screen reader check", since axe alone cannot
+  verify their accessibility issues.
+
+New scenarios added to the manifest automatically receive generated tests without requiring framework code changes.
+
+To run the generated tests:
+
+```bash
+npx playwright test tests/generated-scenarios.spec.mts --project=chromium
+```
+
+These tests assist the existing scenario-specific tests which perform additional checks for keyboard navigation, focus management, and DOM changes.
+
 ### What the results show
 
 | Variant | Before | DOM change detected? | After |

@@ -2,6 +2,7 @@ import { test, expect, request, type Page } from "@playwright/test";
 import { createRequire } from "node:module";
 import type { SetupStep, Variant } from "./helpers/scenarios";
 
+// Allows ES module to use CommonJS helpers
 const require = createRequire(import.meta.url);
 
 const { loadScenarios } = require("./helpers/scenarios") as
@@ -10,6 +11,7 @@ const { loadScenarios } = require("./helpers/scenarios") as
 const { runAxe } = require("./helpers/axe") as
   typeof import("./helpers/axe");
 
+// Load scenarios from manifest
 const baseURL =
   process.env.BASE_URL ??
   "https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/";
@@ -34,6 +36,7 @@ const AXE_TAGS = [
   "best-practice",
 ];
 
+// Runs action listed in manifest via test ID
 async function runSetupStep(page: Page, step: SetupStep) {
   const element = page.getByTestId(step.testid);
 
@@ -61,6 +64,7 @@ async function runSetupStep(page: Page, step: SetupStep) {
   }
 }
 
+// Helps with test running speed, shortens delay if possible
 function getUrlWithDelay(url: string, defaultDelay: number): string {
   if (defaultDelay <= 0) return url;
 
@@ -70,6 +74,7 @@ function getUrlWithDelay(url: string, defaultDelay: number): string {
   return `${route}?${params}`;
 }
 
+// Generates test for each scenario and variant
 for (const scenario of scenarios) {
   for (const variant of variants) {
     test.describe(() => {
@@ -81,6 +86,7 @@ for (const scenario of scenarios) {
         );
         await expect(page.getByTestId("scenario-root")).toBeVisible();
 
+        // Waits to scan page until setup steps are completed
         for (const step of scenario.setup) {
           await runSetupStep(page, step);
         }
