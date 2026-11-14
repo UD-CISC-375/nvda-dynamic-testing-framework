@@ -88,7 +88,7 @@ for (const scenario of scenarios) {
           expect(actualRules).toEqual([]);
         } else {
           for (const rule of scenario.axe.brokenRules) {
-            expect(
+            expect.soft(
               actualRules,
               `${scenario.id} should violate ${rule}`
             ).toContain(rule);
