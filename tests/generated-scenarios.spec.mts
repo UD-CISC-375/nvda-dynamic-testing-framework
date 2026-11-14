@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url);
 const { loadScenarios } = require("./helpers/scenarios") as
   typeof import("./helpers/scenarios");
 
-const { runAxe, WCAG_TAGS } = require("./helpers/axe") as
+const { runAxe, BEST_PRACTICE_TAGS } = require("./helpers/axe") as
   typeof import("./helpers/axe");
 
 // Load scenarios from manifest
@@ -81,7 +81,8 @@ for (const scenario of scenarios) {
           await runSetupStep(page, step);
         }
 
-        const violations = await runAxe(page, testInfo, "generated", WCAG_TAGS);
+        // Opt in to best-practice: some manifest brokenRules (e.g. aria-dialog-name) are best-practice only.
+        const violations = await runAxe(page, testInfo, "generated", BEST_PRACTICE_TAGS);
         const actualRules = violations.map((violation) => violation.id);
 
         if (variant === "accessible") {
