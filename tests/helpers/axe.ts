@@ -21,6 +21,36 @@ export const WCAG_TAGS = [
 export const BEST_PRACTICE_TAGS = [...WCAG_TAGS, "best-practice"];
 
 /**
+ * True when a violated rule maps to WCAG A/AA, so it should fail a test.
+ * Anything else the scan finds (in practice, best-practice rules) is a warning.
+ * A rule tagged both WCAG and best-practice counts as WCAG.
+ */
+export function isWcagViolation(violation: Pick<Result, "tags">) {
+  return violation.tags.some((tag) => WCAG_TAGS.includes(tag));
+}
+
+/**
+ * Splits one scan's violations into failures (WCAG) and warnings (the rest),
+ * keeping axe's order inside each list.
+ */
+export function splitViolations(violations: Result[]) {
+  return {
+    failures: violations.filter(isWcagViolation),
+    warnings: violations.filter((v) => !isWcagViolation(v)),
+  };
+}
+
+/**
+ * Scans with WCAG + best-practice and returns `{ failures, warnings }`.
+ * For specs that need to see best-practice findings (e.g. the broken dialog's
+ * `aria-dialog-name`); everything else should use runAxe.
+ */
+export async function scanAxe(page: Page, testInfo: TestInfo, label: string) {
+  // One scan covers both lists; the split happens afterwards, by tag.
+  return splitViolations(await scan(page, testInfo, label, BEST_PRACTICE_TAGS));
+}
+
+/**
  * Runs axe against the page as it is *right now* and returns the violations.
  * `label` (e.g. "before" / "after") names the report attachment so we can
  * tell scans of the same page apart.
@@ -30,6 +60,16 @@ export async function runAxe(
   testInfo: TestInfo,
   label: string,
   tags: string[] = WCAG_TAGS,
+) {
+  return scan(page, testInfo, label, tags);
+}
+
+// Shared by runAxe and scanAxe: scan, log a summary, attach the raw results.
+async function scan(
+  page: Page,
+  testInfo: TestInfo,
+  label: string,
+  tags: string[],
 ) {
   const results = await new AxeBuilder({ page }).withTags(tags).analyze();
 
