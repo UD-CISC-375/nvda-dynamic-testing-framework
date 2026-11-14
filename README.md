@@ -107,7 +107,7 @@ axe column: rules axe flags in the **broken** variant, according to the test sit
 | Submission confirmation   | `/forms/success`           | 4.1.3, 2.4.3, 3.2.2        | nothing                        | Confirmation in an existing `role="status"` region, focus not lost to `<body>`                                                     | [submission-confirmation](tests/submission-confirmation.spec.ts)           |
 | Autocomplete combobox     | `/dynamic/combobox`        | 2.1.1                      | `aria-required-parent`, `list` | Combobox/listbox roles, result count announced, keyboard selection                                                                 | [combobox](tests/combobox.spec.ts)                                         |
 | Delayed content injection | `/dynamic/delayed-content` | 4.1.3, 1.3.1, 2.4.6        | nothing                        | Loading/loaded status messages, real heading, named region, list items                                                             | [delayed-content](tests/delayed-content.spec.ts)                           |
-| Load more                 | `/dynamic/load-more`       | 4.1.3, 2.4.3               | nothing                        | _Pending: [#147](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/147)_                                          |                                                                            |
+| Load more                 | `/dynamic/load-more`       | 4.1.3, 2.4.3               | nothing                        | Status announcements while loading, and focus moving to the first newly loaded article                                            | [load-more](tests/load-more.spec.ts)                                      |
 | Sortable table            | `/dynamic/sortable-table`  | 4.1.2, 1.3.1               | nothing                        | _Pending: [#141](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/141)_                                          |                                                                            |
 
 The full results for each scenario, with before/after tables, are in [docs/scenarios.md](docs/scenarios.md).
@@ -133,6 +133,7 @@ playwright.config.ts   baseURL, CI web server, `chromium` and `manual` projects
 
 ## Documentation
 
+### Files
 - [docs/how-it-works.md](docs/how-it-works.md): pipeline, meaningful-change definition, decisions, open questions, results format
 - [docs/watch-dom.md](docs/watch-dom.md): `watchDom` API reference
 - [docs/aria-tree.md](docs/aria-tree.md): accessibility-tree helpers and settle detection
