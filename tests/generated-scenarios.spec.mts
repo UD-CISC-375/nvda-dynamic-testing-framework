@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url);
 const { loadScenarios } = require("./helpers/scenarios") as
   typeof import("./helpers/scenarios");
 
-const { runAxe } = require("./helpers/axe") as
+const { runAxe, WCAG_TAGS } = require("./helpers/axe") as
   typeof import("./helpers/axe");
 
 // Load scenarios from manifest
@@ -25,16 +25,6 @@ try {
 }
 
 const variants: Variant[] = ["accessible", "broken"];
-
-const AXE_TAGS = [
-  "wcag2a",
-  "wcag2aa",
-  "wcag21a",
-  "wcag21aa",
-  "wcag22a",
-  "wcag22aa",
-  "best-practice",
-];
 
 // Runs action listed in manifest via test ID
 async function runSetupStep(page: Page, step: SetupStep) {
@@ -91,7 +81,7 @@ for (const scenario of scenarios) {
           await runSetupStep(page, step);
         }
 
-        const violations = await runAxe(page, testInfo, "generated", AXE_TAGS);
+        const violations = await runAxe(page, testInfo, "generated", WCAG_TAGS);
         const actualRules = violations.map((violation) => violation.id);
 
         if (variant === "accessible") {
