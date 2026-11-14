@@ -65,14 +65,12 @@ By default the tests run against the [live test site](https://ud-cisc-375.github
 
 The HTML report opens automatically after a local run. Press Ctrl+C to stop the report server. Each test attaches its evidence to the report: the axe results (`axe-before.json`, `axe-after.json`), the accessibility trees and their diff (`tree-*.yaml`, `tree-*-diff.json`), and the logged DOM changes (`stdout`).
 
-### Manifest-Driven Accessibility Tests
+## Manifest-Driven Accessibility Tests
 
-<<<<<<< HEAD
 The framework includes a generated test runner that reads scenario
 data from Team Y's `scenarios.json` manifest.
-=======
+
 The framework includes a generated test runner that reads scenario data from Team Y's `scenarios.json` manifest.
->>>>>>> 0faccaa (pulled new README and added new info to it)
 
 The runner automatically creates tests for both the accessible and broken variants of each scenario. It executes the setup steps defined in the manifest and runs axe-core accessibility checks.
 
