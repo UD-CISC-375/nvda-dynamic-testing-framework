@@ -2,10 +2,11 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Page, TestInfo } from "@playwright/test";
 import type { Result } from "axe-core";
 
-// Only run the rules that map to WCAG 2.0/2.1/2.2 levels A and AA, plus best-practice checks.
+// The repo's one axe tag policy. Specs import these instead of writing their own lists.
 // A: WCAG minimum baseline
 // AA: WCAG Standard Benchmark
 
+// Default: only the rules that map to WCAG 2.0/2.1/2.2 levels A and AA.
 export const WCAG_TAGS = [
   "wcag2a",
   "wcag2aa",
@@ -13,8 +14,11 @@ export const WCAG_TAGS = [
   "wcag21aa",
   "wcag22a",
   "wcag22aa",
-  "best-practice",
 ];
+
+// Opt-in: WCAG plus axe's best-practice rules, for flaws axe only tags as
+// best-practice (e.g. `aria-dialog-name` on the broken dialog).
+export const BEST_PRACTICE_TAGS = [...WCAG_TAGS, "best-practice"];
 
 /**
  * Runs axe against the page as it is *right now* and returns the violations.
