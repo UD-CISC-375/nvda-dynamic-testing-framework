@@ -1,0 +1,7 @@
+- button "Actions" [expanded]
+- menu "Actions":
+  - menuitem "Duplicate"
+  - menuitem "Rename"
+  - menuitem "Archive"
+  - menuitem "Delete"
+- status

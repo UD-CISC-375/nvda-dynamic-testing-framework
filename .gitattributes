@@ -1,0 +1,2 @@
+# Keep Unix line endings so the scripts inside the Dockerfile run in Linux containers, even on Windows.
+Dockerfile text eol=lf

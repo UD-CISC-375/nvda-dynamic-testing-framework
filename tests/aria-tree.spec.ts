@@ -2,6 +2,9 @@
 import { test, expect, Locator } from "@playwright/test";
 // Import the helpers that snapshot a tree and wait for it to change.
 import { snapshotTree, waitForTreeChange } from "./helpers/aria-tree";
+// Parse and diff real snapshots, for the iframe guard below.
+import { parseSnapshot } from "./helpers/parse-snapshot";
+import { diffTrees } from "./helpers/diff-trees";
 
 // A page where clicking moves focus right away but the real content arrives 600 ms later.
 const delayedContentPage = `
@@ -40,6 +43,42 @@ test("content that appears 600 ms after a click is in the settled result", async
   expect(after.content).toContain("Loaded 3 items");
   // Focus is still reported, through refs, on the heading.
   expect(after.refs).toMatch(/heading "Results".*\[active\]/);
+});
+
+// A page with a paragraph outside an iframe and a button inside it.
+const iframePage = `
+  <main>
+    <p id="outside">Before</p>
+    <iframe srcdoc="<button>Inside</button>"></iframe>
+  </main>
+`;
+
+// #129 ignores iframe contents by never seeing them: default-mode snapshots stop at the
+// iframe line, so no change inside one reaches diffTrees. If Playwright or the merge ever
+// lets iframe content through, this fails, and the diff needs a real iframe flag.
+test("changes inside an iframe produce no TreeChange", async ({ page }) => {
+  // Load the page and wait for the iframe's button, so the frame is filled before snapshotting.
+  await page.setContent(iframePage);
+  const frameButton = page.frameLocator("iframe").getByRole("button");
+  await frameButton.waitFor();
+  const scope = page.locator("body");
+  const first = parseSnapshot(await snapshotTree(scope)).tree;
+
+  // Rename the button inside the iframe: nothing should be reported.
+  await frameButton.evaluate((b) => (b.textContent = "Renamed"));
+  const snap = await snapshotTree(scope);
+  // AI mode does go into iframes, so this proves the rename happened.
+  expect(snap.refs).toContain('button "Renamed"');
+  const second = parseSnapshot(snap).tree;
+  expect(diffTrees(first, second)).toEqual([]);
+
+  // Control: a change outside the iframe is still reported, so the empty diff above
+  // isn't just a broken snapshot.
+  await page.locator("#outside").evaluate((p) => (p.textContent = "After"));
+  const third = parseSnapshot(await snapshotTree(scope)).tree;
+  expect(diffTrees(second, third)).toEqual([
+    { kind: "textChanged", path: "main > paragraph", ref: expect.any(String), before: "Before", after: "After" },
+  ]);
 });
 
 // A stand-in for a Locator: only ariaSnapshot exists, and it returns whatever we script.

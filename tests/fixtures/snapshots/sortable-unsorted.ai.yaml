@@ -1,0 +1,29 @@
+- generic [ref=e1]:
+  - table [ref=e3]:
+    - caption [ref=e4]: Employees
+    - rowgroup [ref=e5]:
+      - row [ref=e6]:
+        - columnheader [ref=e7]:
+          - button "Name" [ref=e8] [cursor=pointer]: Name ↕
+        - columnheader [ref=e9]:
+          - button "Department" [ref=e10] [cursor=pointer]: Department ↕
+        - columnheader [ref=e11]:
+          - button "Start date" [ref=e12] [cursor=pointer]: Start date ↕
+    - rowgroup [ref=e13]:
+      - row [ref=e14]:
+        - cell "Grace Hopper" [ref=e15]
+        - cell "Engineering" [ref=e16]
+        - cell "2019-03-11" [ref=e17]
+      - row [ref=e18]:
+        - cell "Alan Turing" [ref=e19]
+        - cell "Research" [ref=e20]
+        - cell "2021-07-01" [ref=e21]
+      - row [ref=e22]:
+        - cell "Ada Lovelace" [ref=e23]
+        - cell "Engineering" [ref=e24]
+        - cell "2018-01-15" [ref=e25]
+      - row [ref=e26]:
+        - cell "Katherine Johnson" [ref=e27]
+        - cell "Operations" [ref=e28]
+        - cell "2020-10-05" [ref=e29]
+  - status [ref=e30]
