@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url);
 const { loadScenarios } = require("./helpers/scenarios") as
   typeof import("./helpers/scenarios");
 
-const { runAxe, BEST_PRACTICE_TAGS } = require("./helpers/axe") as
+const { scanAxe } = require("./helpers/axe") as
   typeof import("./helpers/axe");
 
 // Load scenarios from manifest
@@ -81,13 +81,14 @@ for (const scenario of scenarios) {
           await runSetupStep(page, step);
         }
 
-        // Opt in to best-practice: some manifest brokenRules (e.g. aria-dialog-name) are best-practice only.
-        const violations = await runAxe(page, testInfo, "generated", BEST_PRACTICE_TAGS);
-        const actualRules = violations.map((violation) => violation.id);
+        const { failures, warnings } = await scanAxe(page, testInfo, "generated");
 
         if (variant === "accessible") {
-          expect(actualRules).toEqual([]);
+          // Only WCAG failures fail the accessible variant; warnings are report-only.
+          expect(failures.map((violation) => violation.id)).toEqual([]);
         } else {
+          // Some manifest brokenRules (e.g. aria-dialog-name) are best-practice, so look in both lists.
+          const actualRules = [...failures, ...warnings].map((violation) => violation.id);
           for (const rule of scenario.axe.brokenRules) {
             expect.soft(
               actualRules,

@@ -1,5 +1,5 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
-import { runAxe, BEST_PRACTICE_TAGS } from "./helpers/axe";
+import { runAxe, scanAxe } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
 
 const dialogUrl = (variant: "accessible" | "broken") =>
@@ -34,8 +34,7 @@ test("accessible: opening the dialog is detected, keyboard managed, and axe clea
 ) => {
   await page.goto(dialogUrl("accessible"));
 
-  // best-practice is opt-in: axe tags `aria-dialog-name` only as best-practice.
-  const before = await runAxe(page, testInfo, "before", BEST_PRACTICE_TAGS);
+  const before = await runAxe(page, testInfo, "before");
   expect(before.map((violation) => violation.id)).toEqual([]);
 
   const watcher = await watchDom(page, ".scenario");
@@ -58,7 +57,7 @@ test("accessible: opening the dialog is detected, keyboard managed, and axe clea
   await expect(dialog).toBeHidden();
   await expect(page.getByTestId("trigger")).toBeFocused();
 
-  const after = await runAxe(page, testInfo, "after", BEST_PRACTICE_TAGS);
+  const after = await runAxe(page, testInfo, "after");
   expect(after.map((violation) => violation.id)).toEqual([]);
 });
 
@@ -68,8 +67,7 @@ test("broken: dialog insertion is detected but name and keyboard management are 
 ) => {
   await page.goto(dialogUrl("broken"));
 
-  // Same opt-in as the accessible test, so the after scan can catch `aria-dialog-name`.
-  const before = await runAxe(page, testInfo, "before", BEST_PRACTICE_TAGS);
+  const before = await runAxe(page, testInfo, "before");
   expect(before.map((violation) => violation.id)).toEqual([]);
 
   const watcher = await watchDom(page, ".scenario");
@@ -88,6 +86,7 @@ test("broken: dialog insertion is detected but name and keyboard management are 
   await page.keyboard.press("Escape");
   await expect(dialog).toBeVisible();
 
-  const after = await runAxe(page, testInfo, "after", BEST_PRACTICE_TAGS);
-  expect(after.map((violation) => violation.id)).toContain("aria-dialog-name");
+  // axe tags `aria-dialog-name` as best-practice only, so it arrives as a warning.
+  const after = await scanAxe(page, testInfo, "after");
+  expect(after.warnings.map((violation) => violation.id)).toContain("aria-dialog-name");
 });
