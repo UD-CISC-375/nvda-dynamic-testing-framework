@@ -1,15 +1,14 @@
 
 import { test, expect } from "@playwright/test";
 import { runAxe } from "./helpers/axe";
+import { gotoScenario } from "./helpers/scenarios";
 
 // Team Y's delayed content scenario.
-const delayedContentUrl = (variant: "accessible" | "broken") =>
-  `#/dynamic/delayed-content?variant=${variant}&delay=3000`;
 
 test("accessible: delayed content is announced correctly", async ({
   page,
 }, testInfo) => {
-  await page.goto(delayedContentUrl("accessible"));
+  await gotoScenario(page, "dynamic-inject", "accessible", { delay: 3000 });
   await expect(page.getByTestId("variant")).toHaveText("accessible");
 
   const region = page.getByRole("region", {
@@ -56,7 +55,7 @@ test("accessible: delayed content is announced correctly", async ({
 test("broken: delayed content has no accessibility announcements", async ({
   page,
 }, testInfo) => {
-  await page.goto(delayedContentUrl("broken"));
+  await gotoScenario(page, "dynamic-inject", "broken", { delay: 3000 });
   await expect(page.getByTestId("variant")).toHaveText("broken");
 
   const root = page.getByTestId("scenario-root");

@@ -1,13 +1,12 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
+import { gotoScenario } from "./helpers/scenarios";
 
 // The toast scenario on Team Y's site (WCAG 4.1.3 Status Messages).
 // accessible should pass all of our checks.
 // broken will still pass axe, but we assert what the failure is: the toast
 // region has no role="status", so a screen reader has no live region to watch.
-const toastUrl = (variant: "accessible" | "broken") =>
-  `#/live/toast?variant=${variant}`;
 
 // Watch the whole scenario, not just the region: if the app replaces the
 // region element, that shows up as a childList change on its parent.
@@ -42,7 +41,7 @@ async function clickTrigger(page: Page, testInfo: TestInfo) {
 }
 
 test("toast page loads", async ({ page }) => {
-  await page.goto(toastUrl("accessible"));
+  await gotoScenario(page, "live-toast", "accessible");
 
   await expect(page.getByTestId("variant")).toHaveText("accessible");
   await expect(page.getByTestId("trigger")).toBeVisible();
@@ -53,7 +52,7 @@ test("toast page loads", async ({ page }) => {
 test("accessible: toast is injected into an existing live region and stays clean", async ({
   page,
 }, testInfo) => {
-  await page.goto(toastUrl("accessible"));
+  await gotoScenario(page, "live-toast", "accessible");
   const toastRegion = page.getByTestId("toast-region");
   await expect(page.getByTestId("trigger")).toBeVisible();
 
@@ -108,7 +107,7 @@ test("accessible: toast is injected into an existing live region and stays clean
 test("broken: toast region is NOT a live region", async ({
   page,
 }, testInfo) => {
-  await page.goto(toastUrl("broken"));
+  await gotoScenario(page, "live-toast", "broken");
   const toastRegion = page.getByTestId("toast-region");
   await expect(page.getByTestId("trigger")).toBeVisible();
 

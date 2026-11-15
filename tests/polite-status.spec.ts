@@ -2,11 +2,10 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
+import { gotoScenario } from "./helpers/scenarios";
 
 // WCAG 2.2 SC 4.1.3: Status Messages
 // Test both the accessible and broken polite status variants.
-const politeUrl = (variant: "accessible" | "broken") =>
-  `#/live/polite?variant=${variant}&delay=1000`;
 
 const expectedMessage = "Item added to cart. 1 item in cart.";
 
@@ -31,7 +30,7 @@ async function clickTrigger(page: Page, testInfo: TestInfo) {
 }
 
 test("polite status page loads", async ({ page }) => {
-  await page.goto(politeUrl("accessible"));
+  await gotoScenario(page, "live-polite", "accessible", { delay: 1000 });
 
   await expect(page.getByTestId("variant")).toHaveText("accessible");
   await expect(page.getByTestId("trigger")).toBeVisible();
@@ -41,7 +40,7 @@ test("polite status page loads", async ({ page }) => {
 test("accessible: polite status message uses a live region", async ({
   page,
 }, testInfo) => {
-  await page.goto(politeUrl("accessible"));
+  await gotoScenario(page, "live-polite", "accessible", { delay: 1000 });
 
   // 1. Scan the page before interaction
   const before = await runAxe(page, testInfo, "before");
@@ -80,7 +79,7 @@ test("accessible: polite status message uses a live region", async ({
 test("broken: status message is not exposed in a live region", async ({
   page,
 }, testInfo) => {
-  await page.goto(politeUrl("broken"));
+  await gotoScenario(page, "live-polite", "broken", { delay: 1000 });
 
   // 1. Baseline accessibility scan
   const before = await runAxe(page, testInfo, "before");

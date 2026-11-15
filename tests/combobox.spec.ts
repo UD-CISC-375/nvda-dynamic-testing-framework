@@ -1,14 +1,12 @@
 import { test, expect, Page } from "@playwright/test";
 import { runAxe } from "./helpers/axe";
+import { gotoScenario } from "./helpers/scenarios";
 
 // Addresses WCAG 2.2; 2.1.1 keyboard accessibility standard
 
-const comboboxUrl = (variant: "accessible" | "broken") =>
-  `#/dynamic/combobox?variant=${variant}`;
-
 // Opens the autocomplete scenario and verifies the requested variant loaded.
 async function openCombobox(page: Page, variant: "accessible" | "broken") {
-  await page.goto(comboboxUrl(variant));
+  await gotoScenario(page, "dynamic-combobox", variant);
   await expect(page.getByTestId("variant")).toHaveText(variant);
   await expect(page.getByTestId("scenario-root")).toBeVisible();
 }

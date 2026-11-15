@@ -1,9 +1,7 @@
 import { test, expect, Page } from "@playwright/test";
 import { runAxe } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
-
-const inlineValidationUrl = (variant: "accessible" | "broken") =>
-  `#/forms/inline-validation?variant=${variant}`;
+import { gotoScenario } from "./helpers/scenarios";
 
 const validationReported = (changes: DomChange[]) =>
   changes.some(
@@ -48,7 +46,7 @@ async function triggerBlurValidation(page: Page) {
 test("inline validation page loads with a labeled email field", async ({
   page,
 }) => {
-  await page.goto(inlineValidationUrl("accessible"));
+  await gotoScenario(page, "forms-inline", "accessible");
 
   await expect(page.getByTestId("variant")).toHaveText("accessible");
   await expect(page.getByTestId("email")).toHaveAccessibleName(
@@ -65,7 +63,7 @@ test("accessible: blur validation exposes the error and stays axe-clean", async 
   { page },
   testInfo,
 ) => {
-  await page.goto(inlineValidationUrl("accessible"));
+  await gotoScenario(page, "forms-inline", "accessible");
   await expect(page.getByTestId("email")).toBeVisible();
 
   const before = await runAxe(
@@ -109,7 +107,7 @@ test("broken: blur validation shows an error without programmatic error semantic
   { page },
   testInfo,
 ) => {
-  await page.goto(inlineValidationUrl("broken"));
+  await gotoScenario(page, "forms-inline", "broken");
   await expect(page.getByTestId("email")).toBeVisible();
 
   const before = await runAxe(

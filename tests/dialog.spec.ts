@@ -1,9 +1,7 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 import { runAxe } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
-
-const dialogUrl = (variant: "accessible" | "broken") =>
-  `#/disclosure/dialog?variant=${variant}&delay=0`;
+import { gotoScenario } from "./helpers/scenarios";
 
 const dialogInserted = (changes: DomChange[]) =>
   changes.some((change) => change.type === "childList" && change.added.length > 0);
@@ -30,7 +28,7 @@ async function openDialog(page: Page, testInfo: TestInfo) {
 }
 
 test("dialog page loads closed", async ({ page }) => {
-  await page.goto(dialogUrl("accessible"));
+  await gotoScenario(page, "disclosure-dialog", "accessible", { delay: 0 });
 
   await expect(page.getByTestId("variant")).toHaveText("accessible");
   await expect(page.getByTestId("trigger")).toBeVisible();
@@ -41,7 +39,7 @@ test("accessible: opening the dialog is detected, keyboard managed, and axe clea
   { page },
   testInfo,
 ) => {
-  await page.goto(dialogUrl("accessible"));
+  await gotoScenario(page, "disclosure-dialog", "accessible", { delay: 0 });
 
   const before = await runAxe(page, testInfo, "before", dialogAxeTags);
   expect(before.map((violation) => violation.id)).toEqual([]);
@@ -74,7 +72,7 @@ test("broken: dialog insertion is detected but name and keyboard management are 
   { page },
   testInfo,
 ) => {
-  await page.goto(dialogUrl("broken"));
+  await gotoScenario(page, "disclosure-dialog", "broken", { delay: 0 });
 
   const before = await runAxe(page, testInfo, "before", dialogAxeTags);
   expect(before.map((violation) => violation.id)).toEqual([]);

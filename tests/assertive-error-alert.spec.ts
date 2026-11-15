@@ -1,9 +1,7 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
-
-const alertUrl = (variant: "accessible" | "broken") =>
-  `#/live/alert?variant=${variant}&delay=1000`;
+import { gotoScenario } from "./helpers/scenarios";
 
 const expectedError =
   "Error: Could not save changes. Check your connection and try again.";
@@ -31,7 +29,7 @@ async function clickTrigger(page: Page, testInfo: TestInfo) {
 
 
 test("assertive error alert page loads", async ({ page }) => {
-  await page.goto(alertUrl("accessible"));
+  await gotoScenario(page, "live-alert", "accessible", { delay: 1000 });
 
   // verify the correct scenario is displayed
   await expect(page.getByTestId("scenario-root"))
@@ -53,7 +51,7 @@ test("assertive error alert page loads", async ({ page }) => {
 test("accessible: error is announced through an assertive alert", async ({
   page,
 }, testInfo) => {
-  await page.goto(alertUrl("accessible"));
+  await gotoScenario(page, "live-alert", "accessible", { delay: 1000 });
 
   // check accessibility before triggering the error
   const before = await runAxe(page, testInfo, "before");
@@ -101,7 +99,7 @@ test("accessible: error is announced through an assertive alert", async ({
 test("broken: error is not announced through an assertive live region", async ({
   page,
 }, testInfo) => {
-  await page.goto(alertUrl("broken"));
+  await gotoScenario(page, "live-alert", "broken", { delay: 1000 });
 
   // run axe-core before triggering the error
   const before = await runAxe(page, testInfo, "before");

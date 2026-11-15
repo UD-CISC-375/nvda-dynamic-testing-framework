@@ -1,15 +1,14 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
+import { gotoScenario } from "./helpers/scenarios";
 
 // The tab scenario on Team Y's site (WCAG (4.1.2, 2.1.1, 1.3.1, 2.4.7).
 // accessibile should pass all checks
 // broken will pass but outline the failure:
 // tabs are not keyboard operable, aria-selected is unavailable, and tablist is missing
-const tabsUrl = (variant: "accessible" | "broken") =>
-  `#/disclosure/tabs?variant=${variant}`;
 
 async function openTabs(page: Page, variant: "accessible" | "broken") {
-  await page.goto(tabsUrl(variant));
+  await gotoScenario(page, "disclosure-tabs", variant);
   await expect(page.getByTestId("variant")).toHaveText(variant);
   await expect(page.getByTestId("scenario-root")).toBeVisible();
 }
