@@ -46,7 +46,7 @@ test.describe('Sortable Table Scenario', () => {
     await expect(nameHeader).not.toHaveAttribute('aria-sort');
     await expect(page.locator('th[aria-sort]')).toHaveCount(1);
 
-    // 9. Axe accessibility audit with the shared WCAG tags; runAxe also attaches axe-after.json for the reporter.
+    // 9. Axe audit: scans WCAG + best-practice, returns only WCAG failures; also attaches axe-after.json for the reporter.
     const violations = await runAxe(page, testInfo, 'after');
     expect(violations).toEqual([]);
   });
