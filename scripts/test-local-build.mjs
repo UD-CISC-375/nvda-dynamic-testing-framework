@@ -21,6 +21,9 @@ function run(command, args, options = {}) {
   execFileSync(command, args, {
     cwd: frameworkRoot,
     stdio: "inherit",
+    // Node refuses to spawn .cmd files without a shell since CVE-2024-27980 (EINVAL).
+    // Safe here: every argument is a fixed literal, so nothing needs shell quoting.
+    shell: command.endsWith(".cmd"),
     ...options,
   });
 }
