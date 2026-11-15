@@ -1,5 +1,5 @@
 
-import type { APIRequestContext } from "@playwright/test";
+import type { APIRequestContext, Page } from "@playwright/test";
 
 // Defines the two possible versions of a scenario
 export type Variant = "accessible" | "broken";
@@ -111,4 +111,47 @@ export async function loadScenarios(
   }
 
   return manifest.scenarios;
+}
+
+// One manifest load per worker: every spec in the worker reads the same deployed file.
+let cachedScenarios: Promise<ScenarioEntry[]> | undefined;
+
+// Set the delay query param, keeping the route and any other params as they are.
+export function withDelay(url: string, delay: number): string {
+  // Manifest URLs are hash routes like "#/live/polite?variant=broken".
+  const [route, query = ""] = url.split("?");
+  const params = new URLSearchParams(query);
+  // set() replaces an existing delay instead of appending a second one.
+  params.set("delay", String(delay));
+  return `${route}?${params}`;
+}
+
+// Open a scenario variant at the URL scenarios.json gives for it.
+// Pass delay to pin the async timing a spec depends on; omit it to use the site's default.
+export async function gotoScenario(
+  page: Page,
+  id: string,
+  variant: Variant,
+  { delay }: { delay?: number } = {}
+): Promise<void> {
+  // page.request resolves "./scenarios.json" against the project's baseURL.
+  cachedScenarios ??= loadScenarios(page.request);
+  let scenarios: ScenarioEntry[];
+  try {
+    scenarios = await cachedScenarios;
+  } catch (error) {
+    // Don't cache a failed load, so a retry in the same worker fetches again.
+    cachedScenarios = undefined;
+    throw error;
+  }
+  const scenario = scenarios.find((s) => s.id === id);
+  // A typo in an id should name the valid ones, not fail later on a missing element.
+  if (!scenario) {
+    throw new Error(
+      `Unknown scenario id "${id}". scenarios.json has: ${scenarios.map((s) => s.id).join(", ")}`
+    );
+  }
+  const url = scenario.urls[variant];
+  // delay: 0 is meaningful (immediate updates), so check for undefined, not falsiness.
+  await page.goto(delay === undefined ? url : withDelay(url, delay));
 }
