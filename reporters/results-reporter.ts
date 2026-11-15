@@ -9,8 +9,9 @@ import path from "node:path";
 import type {
   AxeViolation, Results, ScenarioResult, StateResult, TreeDiff,
 } from "../results/schema";
-// The same fail/warn rule the specs use, so results.json counts only WCAG failures.
-import { isWcagViolation } from "../tests/helpers/axe";
+// The same fail/warn rule the specs use, from the dependency-free policy module
+// (no axe runner or Playwright loaded), so results.json counts only WCAG failures.
+import { isWcagViolation } from "../tests/helpers/axe-policy";
 
 // Fixed output location. The reporter writes here after every run so
 // downstream consumers always know where to look.

@@ -39,7 +39,7 @@ On `main`, each scenario spec puts these steps together itself. A single combine
 
 ### Which axe findings fail a test
 
-Every scan runs the same rules: WCAG 2.0/2.1/2.2 levels A and AA, plus axe's best-practice rules. The policy lives in one place, [`tests/helpers/axe.ts`](../tests/helpers/axe.ts), and specs don't choose tags.
+Every scan runs the same rules: WCAG 2.0/2.1/2.2 levels A and AA, plus axe's best-practice rules. The policy lives in one place, [`tests/helpers/axe-policy.ts`](../tests/helpers/axe-policy.ts), which [`tests/helpers/axe.ts`](../tests/helpers/axe.ts) uses for every scan; specs don't choose tags.
 
 - **WCAG A/AA violations are failures.** `runAxe` returns only these, and they are the violations counted in `results.json`.
 - **Everything else is a warning.** In practice that means best-practice rules. Warnings are logged with `[warn]` and kept in the `axe-*.json` attachment, but they don't fail a test.

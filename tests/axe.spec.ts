@@ -1,7 +1,7 @@
 // Browser-free unit tests for the axe fail/warn split (no page is opened in this file).
 import { test, expect } from "@playwright/test";
 import type { Result } from "axe-core";
-import { isWcagViolation, splitViolations } from "./helpers/axe";
+import { isWcagViolation, splitViolations } from "./helpers/axe-policy";
 
 // A hand-built violation with only the fields the split reads; the cast lets us skip the rest.
 const violation = (id: string, tags: string[]) => ({ id, tags, nodes: [] }) as unknown as Result;

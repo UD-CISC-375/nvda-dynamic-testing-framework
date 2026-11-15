@@ -145,7 +145,8 @@ tests/
   helpers/
     watch-dom.ts       watchDom(): DOM + focus change recorder
     aria-tree.ts       snapshotTree, waitForTreeChange, diffTree, refOf, attachTreeDiff
-    axe.ts             runAxe(), scanAxe() and diffViolations(); the axe fail/warn policy
+    axe.ts             runAxe(), scanAxe() and diffViolations()
+    axe-policy.ts      WCAG_TAGS, SCAN_TAGS, isWcagViolation(), splitViolations(): the axe fail/warn policy
     scenarios.ts       loadScenarios(): reads the test site's scenarios.json
   *.spec.ts            one spec per scenario, plus unit tests for the helpers
     generated-scenarios.spec.mts   generates axe tests from scenarios.json
