@@ -9,6 +9,8 @@ import path from "node:path";
 import type {
   AxeViolation, Results, ScenarioResult, StateResult, TreeDiff,
 } from "../results/schema";
+// The same fail/warn rule the specs use, so results.json counts only WCAG failures.
+import { isWcagViolation } from "../tests/helpers/axe";
 
 // Fixed output location. The reporter writes here after every run so
 // downstream consumers always know where to look.
@@ -35,11 +37,14 @@ function readAttachment(
   }
 }
 
-// Flattens raw axe output  into one 
-// entry per affected element, which is what the schema's AxeViolation uses.
+// Flattens raw axe output into one entry per affected element, which is what
+// the schema's AxeViolation uses. Best-practice warnings are dropped: the scan
+// attaches them, but only WCAG failures count as violations here.
 const toViolations = (axe: any): AxeViolation[] =>
-  (axe?.violations ?? []).flatMap((v: any) =>
-    (v.nodes ?? []).map((n: any) => ({ rule: v.id, target: n.target ?? [] })));
+  (axe?.violations ?? [])
+    .filter((v: any) => isWcagViolation({ tags: v.tags ?? [] }))
+    .flatMap((v: any) =>
+      (v.nodes ?? []).map((n: any) => ({ rule: v.id, target: n.target ?? [] })));
 
 // Same-rule + same-selector identity, matching diffViolations in tests/helpers/axe.ts.
 const keyOf = (v: AxeViolation) => `${v.rule} ${JSON.stringify(v.target)}`;
