@@ -1,6 +1,7 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
+import { trigger } from "./helpers/trigger";
 
 // The accordion scenario on Team Y's site. The site uses hash routing, so the
 // "page" lives after the # and the server always serves the same index.html.
@@ -28,17 +29,11 @@ const accordionOpened = (changes: DomChange[]) =>
 // for us; in the "manual" project we wait for a person to click in the
 // visible browser. Either way the watcher started earlier sees the same DOM
 // change.
-async function clickTrigger(page: Page, testInfo: TestInfo) {
-  if (testInfo.project.name === "manual") {
-    console.log(">>> Click the first accordion header in the browser window <<<");
-    // This only waits for the human. The watcher still does the detecting.
-    await expect(page.getByTestId("accordion-panel-1")).toBeVisible({
-      timeout: testInfo.timeout,
-    });
-  } else {
-    await page.getByTestId("trigger").click();
-  }
-}
+const clickTrigger = (page: Page, testInfo: TestInfo) =>
+  trigger(page, testInfo, {
+    prompt: ">>> Click the first accordion header in the browser window <<<",
+    humanDone: (timeout) => expect(page.getByTestId("accordion-panel-1")).toBeVisible({ timeout }),
+  });
 
 test("accordion page loads", async ({ page }) => {
   await page.goto(accordionUrl("accessible"));

@@ -1,6 +1,7 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 import { runAxe } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
+import { trigger } from "./helpers/trigger";
 
 const dialogUrl = (variant: "accessible" | "broken") =>
   `#/disclosure/dialog?variant=${variant}&delay=0`;
@@ -17,17 +18,17 @@ const dialogAxeTags = [
   "best-practice",
 ];
 
-async function openDialog(page: Page, testInfo: TestInfo) {
-  if (testInfo.project.name === "manual") {
-    console.log(">>> Click the Open profile settings button in the browser window <<<");
-    await expect(page.getByTestId("dialog")).toBeVisible({
-      timeout: testInfo.timeout,
-    });
-  } else {
-    await page.getByTestId("trigger").focus();
-    await page.keyboard.press("Enter");
-  }
-}
+// Open the dialog, or wait for a person to open it in manual mode.
+const openDialog = (page: Page, testInfo: TestInfo) =>
+  trigger(page, testInfo, {
+    prompt: ">>> Click the Open profile settings button in the browser window <<<",
+    humanDone: (timeout) => expect(page.getByTestId("dialog")).toBeVisible({ timeout }),
+    // Open with the keyboard (focus + Enter), not a click.
+    auto: async () => {
+      await page.getByTestId("trigger").focus();
+      await page.keyboard.press("Enter");
+    },
+  });
 
 test("dialog page loads closed", async ({ page }) => {
   await page.goto(dialogUrl("accessible"));
