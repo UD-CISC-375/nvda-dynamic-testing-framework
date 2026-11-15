@@ -29,11 +29,12 @@ function run(command, args, options = {}) {
 }
 
 try {
+  // Clone the same repo CI checks out (ci.yaml), not the old pre-transfer owner it redirects from.
   run("git", [
     "clone",
     "--depth",
     "1",
-    "https://github.com/mlorang/nvda-dynamic-testing-webpage.git",
+    "https://github.com/UD-CISC-375/nvda-dynamic-testing-webpage.git",
     siteRepository,
   ]);
 
