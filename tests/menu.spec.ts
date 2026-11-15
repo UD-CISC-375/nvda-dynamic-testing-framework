@@ -1,6 +1,7 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
+import { trigger } from "./helpers/trigger";
 
 // The menu scenario on Team Y's site. The site uses hash routing, so the
 // "page" lives after the # and the server always serves the same index.html.
@@ -25,17 +26,11 @@ const menuOpened = (changes: DomChange[]) =>
 // Opens the menu. In the "chromium" project Playwright clicks for us; in the
 // "manual" project we wait for a person to click in the visible browser.
 // Either way the watcher started earlier sees the same DOM change.
-async function clickTrigger(page: Page, testInfo: TestInfo) {
-  if (testInfo.project.name === "manual") {
-    console.log(">>> Click the menu button in the browser window <<<");
-    // This only waits for the human. The watcher still does the detecting.
-    await expect(page.getByTestId("menu")).toBeVisible({
-      timeout: testInfo.timeout,
-    });
-  } else {
-    await page.getByTestId("trigger").click();
-  }
-}
+const clickTrigger = (page: Page, testInfo: TestInfo) =>
+  trigger(page, testInfo, {
+    prompt: ">>> Click the menu button in the browser window <<<",
+    humanDone: (timeout) => expect(page.getByTestId("menu")).toBeVisible({ timeout }),
+  });
 
 test("menu page loads", async ({ page }) => {
   await page.goto(menuUrl("accessible"));

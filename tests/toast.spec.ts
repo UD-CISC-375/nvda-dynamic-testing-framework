@@ -1,6 +1,7 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
+import { trigger } from "./helpers/trigger";
 
 // The toast scenario on Team Y's site (WCAG 4.1.3 Status Messages).
 // accessible should pass all of our checks.
@@ -29,17 +30,12 @@ const toastRemoved = (changes: DomChange[]) =>
 // Sends the message. In the "chromium" project Playwright clicks for us; in
 // the "manual" project we wait for a person to click in the visible browser.
 // Either way the watcher started earlier sees the same DOM change.
-async function clickTrigger(page: Page, testInfo: TestInfo) {
-  if (testInfo.project.name === "manual") {
-    console.log(">>> Click 'Send message' in the browser window <<<");
-    // This only waits for the human. The watcher still does the detecting.
-    await expect(page.getByTestId("toast-region")).toContainText(/.+/, {
-      timeout: testInfo.timeout,
-    });
-  } else {
-    await page.getByTestId("trigger").click();
-  }
-}
+const clickTrigger = (page: Page, testInfo: TestInfo) =>
+  trigger(page, testInfo, {
+    prompt: ">>> Click 'Send message' in the browser window <<<",
+    humanDone: (timeout) =>
+      expect(page.getByTestId("toast-region")).toContainText(/.+/, { timeout }),
+  });
 
 test("toast page loads", async ({ page }) => {
   await page.goto(toastUrl("accessible"));
