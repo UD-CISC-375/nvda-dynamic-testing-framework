@@ -59,7 +59,7 @@ test("accessible: blur validation exposes the error and stays axe-clean", async 
   await page.goto(inlineValidationUrl("accessible"));
   await expect(page.getByTestId("email")).toBeVisible();
 
-  // Default WCAG_TAGS from helpers/axe.
+  // Shared axe policy: fails on WCAG A/AA only; best-practice is logged as a warning.
   const before = await runAxe(page, testInfo, "before");
   expect(before.map((violation) => violation.id)).toEqual([]);
 
@@ -94,7 +94,7 @@ test("broken: blur validation shows an error without programmatic error semantic
   await page.goto(inlineValidationUrl("broken"));
   await expect(page.getByTestId("email")).toBeVisible();
 
-  // Default WCAG_TAGS from helpers/axe.
+  // Shared axe policy: fails on WCAG A/AA only; best-practice is logged as a warning.
   const before = await runAxe(page, testInfo, "before");
   expect(before.map((violation) => violation.id)).toEqual([]);
 
