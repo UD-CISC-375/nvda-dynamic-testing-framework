@@ -16,7 +16,7 @@ Tests call `page.goto("#/...")`, and Playwright prepends `baseURL` from [`playwr
 Most scenario specs follow the same shape for each variant:
 
 1. Open the page and wait for it to render. The site is a React app, and `expect(...)` retries until elements appear.
-2. Run the **before** axe scan (`runAxe(page, testInfo, "before")`).
+2. Run the **before** axe scan (`runAxe(page, testInfo, "before")`). Don't pass your own axe tags: `runAxe` returns the WCAG failures, and best-practice findings are warnings (see [Which axe findings fail a test](how-it-works.md#which-axe-findings-fail-a-test)).
 3. Start `watchDom` on the scenario's root element.
 4. Do the interaction. In the `manual` project, wait for a person to do it instead.
 5. `watcher.waitFor(...)` until the expected change has been recorded.
@@ -30,7 +30,7 @@ The **accessible** variant should pass every check. The **broken** variant's tes
 1. Find the scenario in `scenarios.json`. Note its route, `flaw`, `brokenRules`, and `nvdaOnly`.
 2. Create `tests/<scenario>.spec.ts`. Copy the structure of a similar spec. [`menu.spec.ts`](../tests/menu.spec.ts) and [`toast.spec.ts`](../tests/toast.spec.ts) are good templates, including manual-mode support.
 3. Write a predicate for the change you expect, and pass it to `watcher.waitFor`.
-4. If axe can't see the flaw (`nvdaOnly: true`), say so in a comment at the top of the spec, and assert the flaw directly.
+4. If axe can't see the flaw (`nvdaOnly: true`), say so in a comment at the top of the spec, and assert the flaw directly. If `brokenRules` includes a best-practice rule (such as `aria-dialog-name`), use `scanAxe` and check its `warnings`.
 5. Add a row to the [README coverage table](../README.md#scenario-coverage). If the results are interesting, add a section below.
 
 ## Detailed results
