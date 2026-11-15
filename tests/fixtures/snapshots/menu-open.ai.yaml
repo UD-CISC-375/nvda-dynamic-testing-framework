@@ -1,0 +1,8 @@
+- generic [ref=e2]:
+  - button "Actions" [expanded] [ref=e3] [cursor=pointer]
+  - menu "Actions" [ref=e9]:
+    - menuitem "Duplicate" [active] [ref=e10] [cursor=pointer]
+    - menuitem "Rename" [ref=e11] [cursor=pointer]
+    - menuitem "Archive" [ref=e12] [cursor=pointer]
+    - menuitem "Delete" [ref=e13] [cursor=pointer]
+  - status [ref=e8]

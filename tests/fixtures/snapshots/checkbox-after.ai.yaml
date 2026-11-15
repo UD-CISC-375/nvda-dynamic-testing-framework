@@ -1,0 +1,4 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - checkbox "Agree" [checked] [active] [ref=e4]
+    - text: Agree

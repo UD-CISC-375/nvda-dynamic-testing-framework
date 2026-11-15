@@ -1,0 +1,8 @@
+- main:
+  - list:
+    - listitem: Bread
+    - listitem: Milk
+  - list:
+    - listitem: Eggs
+    - listitem: Milk
+  - button "Add milk"

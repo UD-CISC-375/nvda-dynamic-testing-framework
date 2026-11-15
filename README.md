@@ -65,6 +65,32 @@ By default the tests run against the [live test site](https://ud-cisc-375.github
 
 The HTML report opens automatically after a local run. Press Ctrl+C to stop the report server. Each test attaches its evidence to the report: the axe results (`axe-before.json`, `axe-after.json`), the accessibility trees and their diff (`tree-*.yaml`, `tree-*-diff.json`), and the logged DOM changes (`stdout`).
 
+## Manifest-Driven Accessibility Tests
+
+The framework includes a generated test runner that reads scenario
+data from Team Y's `scenarios.json` manifest.
+
+The framework includes a generated test runner that reads scenario data from Team Y's `scenarios.json` manifest.
+
+The runner automatically creates tests for both the accessible and broken variants of each scenario. It executes the setup steps defined in the manifest and runs axe-core accessibility checks.
+
+- Accessible variants must have no axe violations.
+- Broken variants must contain every expected rule listed in
+  `brokenRules`.
+- Scenarios marked `nvdaOnly` are skipped with the reason
+  "needs a screen reader check", since axe alone cannot
+  verify their accessibility issues.
+
+New scenarios added to the manifest automatically receive generated tests without requiring framework code changes.
+
+To run the generated tests:
+
+```bash
+npx playwright test tests/generated-scenarios.spec.mts --project=chromium
+```
+
+These tests assist the existing scenario-specific tests which perform additional checks for keyboard navigation, focus management, and DOM changes.
+
 ## How it works
 
 ```
@@ -107,7 +133,7 @@ axe column: rules axe flags in the **broken** variant, according to the test sit
 | Submission confirmation   | `/forms/success`           | 4.1.3, 2.4.3, 3.2.2        | nothing                        | Confirmation in an existing `role="status"` region, focus not lost to `<body>`                                                     | [submission-confirmation](tests/submission-confirmation.spec.ts)           |
 | Autocomplete combobox     | `/dynamic/combobox`        | 2.1.1                      | `aria-required-parent`, `list` | Combobox/listbox roles, result count announced, keyboard selection                                                                 | [combobox](tests/combobox.spec.ts)                                         |
 | Delayed content injection | `/dynamic/delayed-content` | 4.1.3, 1.3.1, 2.4.6        | nothing                        | Loading/loaded status messages, real heading, named region, list items                                                             | [delayed-content](tests/delayed-content.spec.ts)                           |
-| Load more                 | `/dynamic/load-more`       | 4.1.3, 2.4.3               | nothing                        | _Pending: [#147](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/147)_                                          |                                                                            |
+| Load more                 | `/dynamic/load-more`       | 4.1.3, 2.4.3               | nothing                        | Status announcements while loading, and focus moving to the first newly loaded article                                            | [load-more](tests/load-more.spec.ts)                                      |
 | Sortable table            | `/dynamic/sortable-table`  | 4.1.2, 1.3.1               | nothing                        | _Pending: [#141](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/pull/141)_                                          |                                                                            |
 
 The full results for each scenario, with before/after tables, are in [docs/scenarios.md](docs/scenarios.md).
@@ -122,6 +148,7 @@ tests/
     axe.ts             runAxe() and diffViolations()
     scenarios.ts       loadScenarios(): reads the test site's scenarios.json
   *.spec.ts            one spec per scenario, plus unit tests for the helpers
+    generated-scenarios.spec.mts   generates axe tests from scenarios.json
   fixtures/            standalone HTML pages used by tests
 results/schema.ts      draft results.json contract (schemaVersion 0)
 examples/results.json  example of that contract
@@ -133,6 +160,7 @@ playwright.config.ts   baseURL, CI web server, `chromium` and `manual` projects
 
 ## Documentation
 
+### Files
 - [docs/how-it-works.md](docs/how-it-works.md): pipeline, meaningful-change definition, decisions, open questions, results format
 - [docs/watch-dom.md](docs/watch-dom.md): `watchDom` API reference
 - [docs/aria-tree.md](docs/aria-tree.md): accessibility-tree helpers and settle detection

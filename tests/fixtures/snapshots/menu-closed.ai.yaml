@@ -1,0 +1,3 @@
+- generic [ref=e2]:
+  - button "Actions" [ref=e3] [cursor=pointer]
+  - status [ref=e8]

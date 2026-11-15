@@ -1,0 +1,3 @@
+- main:
+  - checkbox "Agree"
+  - text: Agree

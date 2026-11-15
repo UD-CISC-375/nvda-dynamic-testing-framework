@@ -1,0 +1,3 @@
+- generic [ref=e1]:
+  - button "Add to cart" [active] [ref=e2] [cursor=pointer]
+  - status [ref=e3]: Item added to cart. 1 item in cart.

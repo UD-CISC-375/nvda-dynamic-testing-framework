@@ -1,0 +1,8 @@
+- main [ref=e2]:
+  - list [ref=e3]:
+    - listitem [ref=e4]: Bread
+    - listitem [ref=e8]: Milk
+  - list [ref=e5]:
+    - listitem [ref=e6]: Eggs
+    - listitem [ref=e9]: Milk
+  - button "Add milk" [active] [ref=e7]
