@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { gotoScenario } from './helpers/scenarios';
 
 test.describe('Sortable Table Scenario', () => {
   
-  test('accessible variant - keyboard driven navigation and ARIA attributes', async ({ page, baseURL }) => {
-    // 1. Open accessible variant (use baseURL from config or fallback to local dev server)
-    const host = baseURL || 'http://localhost:5173';
-    await page.goto(`${host}/#/dynamic/sortable-table?variant=accessible`);
+  test('accessible variant - keyboard driven navigation and ARIA attributes', async ({ page }) => {
+    // 1. Open accessible variant (relative to the config baseURL, like every other spec)
+    await gotoScenario(page, 'dynamic-sort-table', 'accessible');
 
     // 2. Check starting state: caption "Employees" exists; no columnheader has aria-sort
     const caption = page.locator('caption');
@@ -51,10 +51,9 @@ test.describe('Sortable Table Scenario', () => {
     expect(axeResults.violations).toEqual([]);
   });
 
-  test('broken variant - verifies keyboard/ARIA failures while functional sort works', async ({ page, baseURL }) => {
+  test('broken variant - verifies keyboard/ARIA failures while functional sort works', async ({ page }) => {
     // 1. Open broken variant
-    const host = baseURL || 'http://localhost:5173';
-    await page.goto(`${host}/#/dynamic/sortable-table?variant=broken`);
+    await gotoScenario(page, 'dynamic-sort-table', 'broken');
 
     // 2. Check missing accessible elements
     const nameButton = page.getByRole('button', { name: 'Name' });
