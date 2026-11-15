@@ -2,27 +2,19 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 // Import the helpers that snapshot, diff, wait on, and attach accessibility trees.
 import { snapshotTree, diffTree, waitForTreeChange, attachTreeDiff, refOf } from "./helpers/aria-tree";
+// Import the shared click-or-wait-for-human step.
+import { trigger } from "./helpers/trigger";
 
 // Duplicated from menu.spec.ts on purpose; importing from a spec file would register its tests.
 // Build the hash route for the menu demo page, selecting the accessible or broken variant.
 const menuUrl = (variant: "accessible" | "broken") => `#/disclosure/menu?variant=${variant}`;
 
 // Open the menu: a human clicks in the "manual" project, otherwise Playwright clicks for us.
-async function clickTrigger(page: Page, testInfo: TestInfo) {
-  // Check whether this run is the manual (human-driven) Playwright project.
-  if (testInfo.project.name === "manual") {
-    // Tell the human tester what to do in the browser window.
-    console.log(">>> Click the menu button in the browser window <<<");
-    // Wait up to 90 seconds for the menu to appear after the human clicks.
-    await expect(page.getByTestId("menu")).toBeVisible({ timeout: 90_000 });
-  // Any non-manual project is automated.
-  } else {
-    // Click the menu's trigger button automatically.
-    await page.getByTestId("trigger").click();
-  // End of manual/automated branch.
-  }
-// End of clickTrigger.
-}
+const clickTrigger = (page: Page, testInfo: TestInfo) =>
+  trigger(page, testInfo, {
+    prompt: ">>> Click the menu button in the browser window <<<",
+    humanDone: (timeout) => expect(page.getByTestId("menu")).toBeVisible({ timeout }),
+  });
 
 // Generate one test per variant so both the accessible and broken menus are checked.
 for (const variant of ["accessible", "broken"] as const) {
