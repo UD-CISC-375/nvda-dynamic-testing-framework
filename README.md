@@ -98,7 +98,7 @@ ACCESSIBILITY_RESULTS_PATH=test-results/accessibility-results.json npm test
 npm run report:html -- test-results/accessibility-results.json results-report.html
 ```
 
-CI publishes `offline-results-report` using results from its test run. Currently only the menu accessibility-tree tests record structured results; other scenarios are not represented in that report. A test that cannot record its states is shown as skipped with a reason, not as accessible. `examples/results.json` remains available for testing the renderer.
+CI publishes `offline-results-report-build` and `offline-results-report-live` artifacts using results from the corresponding test run. Currently only the menu accessibility-tree tests record structured results; other scenarios are not represented in that report. A test that cannot record its states is shown as skipped with a reason, not as accessible. `examples/results.json` remains available for testing the renderer.
 
 For complete findings, each entry in `axe.new` and `axe.resolved` must include the axe `rule`, `target`, `help`, HTTPS `helpUrl`, `failureSummary`, and `html` fields; the generator rejects incomplete findings. The initial state's `axe.new` contains findings present in the baseline scan. Set `nvdaOnly: true` on scenarios with behavior axe cannot assess; the report will show a warning even when axe is clean. Accessibility-tree change records may include `role` and `name` so the report can describe changes in terms developers and screen-reader users recognize. A state may also provide `assistiveTechChanges` with concise plain-language descriptions when a diff alone cannot explain the user impact.
 

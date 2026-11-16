@@ -17,10 +17,6 @@ export default defineConfig({
     ...(process.env.ACCESSIBILITY_RESULTS_PATH
       ? [['./tests/helpers/results-reporter.ts'] as [string]]
       : []),
-  // Custom reporter: builds results/output/results.json from test attachments.
-  reporter: [
-    ['list'],
-    ['html', { open: isCI ? 'never' : 'always' }],
     ['./reporters/results-reporter.ts'],
   ],
   use: {

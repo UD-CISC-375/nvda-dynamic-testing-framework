@@ -1,7 +1,6 @@
 // Import Playwright's test runner, assertion library, and the Page/TestInfo types.
 import { test, expect, Page, TestInfo } from "@playwright/test";
 // Import the helpers that snapshot, diff, wait on, and attach accessibility trees.
-import { snapshotTree, diffTree, waitForTreeChange, attachTreeDiff } from "./helpers/aria-tree";
 import { runAxe } from "./helpers/axe";
 import { attachMenuResult, captureMenuSnapshot } from "./helpers/menu-results";
 import { snapshotTree, diffTree, waitForTreeChange, attachTreeDiff, refOf } from "./helpers/aria-tree";
@@ -52,7 +51,6 @@ for (const variant of ["accessible", "broken"] as const) {
     // Poll until the accessibility tree changes and settles, then capture it.
     const after = await waitForTreeChange(scope, before);
     // Compute which tree lines were added and removed by opening the menu.
-    const diff = diffTree(before, after);
     const afterAxe = await runAxe(page, testInfo, "report-after");
     const afterResult = await captureMenuSnapshot(trigger, afterAxe);
     await attachMenuResult(testInfo, variant, beforeResult, afterResult, page.getByTestId("menu"));
