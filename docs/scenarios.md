@@ -102,6 +102,19 @@ The accessible version keeps the same status region while it updates the message
 
 **axe can't detect this flaw** (`nvdaOnly: true`). The tests check the status region and the HTML structure directly.
 
+### Load more
+
+Route: [`#/dynamic/load-more`](https://ud-cisc-375.github.io/nvda-dynamic-testing-webpage/#/dynamic/load-more?variant=accessible) · Spec: [`load-more.spec.ts`](../tests/load-more.spec.ts)
+
+The scenario starts with 5 articles and adds 5 more each time the button is pressed, up to 15. Each variant's test loads more twice, using the keyboard (`button.press("Enter")`), and checks the status region and focus after each load.
+
+| Variant | Status messages | Focus | axe |
+|---|---|---|---|
+| accessible | `"Loading more articles…"`, then `"Showing N of 15 articles"` | Moves to the first newly loaded article each time | 0 violations |
+| broken | No status region at all | Stays on the button, then falls back to `<body>` once the button disappears after the last load | 0 violations |
+
+**axe can't detect this flaw.** Both variants come back clean — a single-moment scan can't show that the broken version never tells assistive tech new content arrived, or that focus is lost once the button disappears. The tests catch it by checking the status region and focus directly.
+
 ### Other scenarios
 
 The remaining specs on `main` (polite status, assertive alert, toast, loading, accordion, dialog, tabs, inline validation, labels, combobox) are summarized in the [README coverage table](../README.md#scenario-coverage). Each spec's header comment explains what it checks and why. Detailed result tables for them are welcome. Follow the format above.
