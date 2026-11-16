@@ -1,0 +1,3 @@
+- main [ref=e2]:
+  - button "One" [active] [ref=e3]
+  - button "Two" [ref=e4]

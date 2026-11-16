@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const isCI = !!process.env.CI;
+const useLocalBuild = process.env.LOCAL_BUILD === '1';
 const baseURL = process.env.BASE_URL ?? 'https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/';
 
 export default defineConfig({
@@ -16,6 +17,11 @@ export default defineConfig({
     ...(process.env.ACCESSIBILITY_RESULTS_PATH
       ? [['./tests/helpers/results-reporter.ts'] as [string]]
       : []),
+  // Custom reporter: builds results/output/results.json from test attachments.
+  reporter: [
+    ['list'],
+    ['html', { open: isCI ? 'never' : 'always' }],
+    ['./reporters/results-reporter.ts'],
   ],
   use: {
     trace: isCI ? 'on-first-retry' : 'off',
@@ -24,7 +30,7 @@ export default defineConfig({
     // "nvda-dynamic-testing-webpage" instead of being appended after it.
     baseURL,
   },
-  webServer: isCI
+  webServer: useLocalBuild
     ? {
         command: 'npx serve site-root -l 4173',
         url: 'http://127.0.0.1:4173/nvda-dynamic-testing-webpage/',

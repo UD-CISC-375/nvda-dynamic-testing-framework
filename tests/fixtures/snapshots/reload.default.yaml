@@ -1,0 +1,4 @@
+- heading "Reloaded page" [level=1]
+- button "Retry"
+- link "Top":
+  - /url: "#top"

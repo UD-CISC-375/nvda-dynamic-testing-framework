@@ -4,6 +4,7 @@ import { test, expect, Page, TestInfo } from "@playwright/test";
 import { snapshotTree, diffTree, waitForTreeChange, attachTreeDiff } from "./helpers/aria-tree";
 import { runAxe } from "./helpers/axe";
 import { attachMenuResult, captureMenuSnapshot } from "./helpers/menu-results";
+import { snapshotTree, diffTree, waitForTreeChange, attachTreeDiff, refOf } from "./helpers/aria-tree";
 
 // Duplicated from menu.spec.ts on purpose; importing from a spec file would register its tests.
 // Build the hash route for the menu demo page, selecting the accessible or broken variant.
@@ -55,9 +56,10 @@ for (const variant of ["accessible", "broken"] as const) {
     const afterAxe = await runAxe(page, testInfo, "report-after");
     const afterResult = await captureMenuSnapshot(trigger, afterAxe);
     await attachMenuResult(testInfo, variant, beforeResult, afterResult, page.getByTestId("menu"));
+    const diff = diffTree(before.content, after.content);
 
-    // Log the full before and after trees for debugging.
-    console.log(`[tree ${variant}] BEFORE\n${before}\n[tree ${variant}] AFTER\n${after}`);
+    // Log the full before and after content trees for debugging.
+    console.log(`[tree ${variant}] BEFORE\n${before.content}\n[tree ${variant}] AFTER\n${after.content}`);
     // Log the computed added/removed lines.
     console.log(`[tree ${variant}] DIFF`, diff);
     // Attach the before/after trees and the diff to the Playwright test report.
@@ -91,6 +93,32 @@ for (const variant of ["accessible", "broken"] as const) {
     // End of variant-specific assertions.
     }
   // End of the test body.
+  });
+
+  // Refs must identify the same element across snapshots, even when its state changes.
+  test(`${variant}: menu button keeps the same ref after opening`, async ({ page }, testInfo) => {
+    // Navigate to the menu demo page for this variant.
+    await page.goto(menuUrl(variant));
+    // Make sure the trigger button has rendered before taking any snapshot.
+    await expect(page.getByTestId("trigger")).toBeVisible();
+    // Snapshot the whole page.
+    const scope = page.locator("body");
+
+    // Capture the tree before the menu is opened.
+    const before = await snapshotTree(scope);
+    // Open the menu (manually or automatically depending on the project).
+    await clickTrigger(page, testInfo);
+    // Wait for the tree to change and settle.
+    const after = await waitForTreeChange(scope, before);
+
+    // The accessible trigger is named "Actions"; the broken one has no name, so match a button followed by a [marker] instead of a "name".
+    const trigger = variant === "accessible" ? /- button "Actions"/ : /- button \[/;
+    // The trigger button's ref before opening.
+    const refBefore = refOf(before.refs, trigger);
+    // Make sure the button was found at all, so the next check can't pass on undefined === undefined.
+    expect(refBefore).toBeDefined();
+    // After opening, the same button still has the same ref.
+    expect(refOf(after.refs, trigger)).toBe(refBefore);
   });
 // End of the per-variant loop.
 }
