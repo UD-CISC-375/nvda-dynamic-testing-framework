@@ -28,12 +28,20 @@ test("records new and resolved axe findings from the observed menu states", asyn
   const before = await captureMenuSnapshot(trigger, await runAxe(page, testInfo, "before"));
   await trigger.click();
   const after = await captureMenuSnapshot(trigger, await runAxe(page, testInfo, "after"));
-  await attachMenuResult(testInfo, "fixture", before, after, page.getByTestId("menu"));
+  await attachMenuResult(
+    testInfo,
+    { id: "fixture", axe: { brokenRules: [], nvdaOnly: false } },
+    "fixture",
+    before,
+    after,
+    page.getByTestId("menu"),
+  );
 
   const attachment = testInfo.attachments.find((item) => item.name === "accessibility-scenario.json");
   if (!attachment?.body) throw new Error("The scenario result attachment is missing");
   const result: ScenarioResult = JSON.parse(attachment.body.toString());
   expect(result.verdict).toBe("failed");
+  expect(result.nvdaOnly).toBe(false);
   expect(result.states[0].axe.new.map((finding) => finding.rule)).toContain("button-name");
   expect(result.states[1].axe.new.map((finding) => finding.rule)).toContain("image-alt");
   expect(result.states[1].axe.resolved.map((finding) => finding.rule)).toContain("button-name");

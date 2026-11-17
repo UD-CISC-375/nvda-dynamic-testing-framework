@@ -1,6 +1,7 @@
 import type { Locator, TestInfo } from "@playwright/test";
 import type { Result } from "axe-core";
 import type { AxeViolation, ScenarioResult } from "../../results/schema";
+import type { ScenarioEntry } from "./scenarios";
 
 type MenuSnapshot = {
   button: string;
@@ -52,6 +53,7 @@ function labelButton(name: string | undefined): string {
 
 export async function attachMenuResult(
   testInfo: TestInfo,
+  scenarioMeta: Pick<ScenarioEntry, "id" | "axe">,
   variant: string,
   before: MenuSnapshot,
   after: MenuSnapshot,
@@ -128,10 +130,10 @@ export async function attachMenuResult(
     before.violations.length === 0 &&
     after.violations.length === 0;
   const result: ScenarioResult = {
-    scenario: "menu",
+    scenario: scenarioMeta.id,
     variant,
     verdict: passed ? "passed" : "failed",
-    nvdaOnly: true,
+    nvdaOnly: scenarioMeta.axe.nvdaOnly,
     states: [
       {
         index: 0,

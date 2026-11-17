@@ -70,8 +70,6 @@ The HTML report opens automatically after a local run. Press Ctrl+C to stop the 
 The framework includes a generated test runner that reads scenario
 data from Team Y's `scenarios.json` manifest.
 
-The framework includes a generated test runner that reads scenario data from Team Y's `scenarios.json` manifest.
-
 The runner automatically creates tests for both the accessible and broken variants of each scenario. It executes the setup steps defined in the manifest and runs axe-core accessibility checks.
 
 - Accessible variants must have no axe violations.
@@ -80,6 +78,16 @@ The runner automatically creates tests for both the accessible and broken varian
 - Scenarios marked `nvdaOnly` are skipped with the reason
   "needs a screen reader check", since axe alone cannot
   verify their accessibility issues.
+- New scenarios added to the manifest automatically receive generated tests
+  without requiring framework code changes.
+
+To run the generated tests:
+
+```bash
+npx playwright test tests/generated-scenarios.spec.mts --project=chromium
+```
+
+These tests assist the existing scenario-specific tests which perform additional checks for keyboard navigation, focus management, and DOM changes.
 
 ## Generate an offline results report
 
@@ -91,29 +99,19 @@ npm run report:html -- results.json report.html
 
 The report is self-contained: open `report.html` directly from disk or from a CI artifact; it does not need a web server or network access. It puts the verdict for each scenario and variant first, then shows the state timeline, accessibility-tree changes, and new/resolved axe findings. The full source JSON is available in a collapsed disclosure at the bottom.
 
-To record and generate a report from a test run:
+The Playwright reporter writes structured results to
+`results/output/results.json`. Generate the standalone report with:
 
 ```sh
-ACCESSIBILITY_RESULTS_PATH=test-results/accessibility-results.json npm test
-npm run report:html -- test-results/accessibility-results.json results-report.html
+npm test
+npm run report:html -- results/output/results.json results-report.html
 ```
 
-CI publishes `offline-results-report-build` and `offline-results-report-live` artifacts using results from the corresponding test run. Currently only the menu accessibility-tree tests record structured results; other scenarios are not represented in that report. A test that cannot record its states is shown as skipped with a reason, not as accessible. `examples/results.json` remains available for testing the renderer.
+CI publishes `offline-results-report-build` and `offline-results-report-live` artifacts using results from the corresponding test run. Currently only the menu accessibility-tree tests record structured results; other scenarios are not represented in that report. `examples/results.json` remains available for testing the renderer.
 
-For complete findings, each entry in `axe.new` and `axe.resolved` must include the axe `rule`, `target`, `help`, HTTPS `helpUrl`, `failureSummary`, and `html` fields; the generator rejects incomplete findings. The initial state's `axe.new` contains findings present in the baseline scan. Set `nvdaOnly: true` on scenarios with behavior axe cannot assess; the report will show a warning even when axe is clean. Accessibility-tree change records may include `role` and `name` so the report can describe changes in terms developers and screen-reader users recognize. A state may also provide `assistiveTechChanges` with concise plain-language descriptions when a diff alone cannot explain the user impact.
+For complete findings, each entry in `axe.new` and `axe.resolved` must include the axe `rule`, `target`, `help`, HTTPS `helpUrl`, `failureSummary`, and `html` fields; the generator rejects incomplete findings. The initial state's `axe.new` contains findings present in the baseline scan. The report's NVDA-only warning follows `axe.nvdaOnly` in the test site's manifest; a clean axe result does not by itself mean the scenario is accessible. Accessibility-tree change records may include `role` and `name` so the report can describe changes in terms developers and screen-reader users recognize. A state may also provide `assistiveTechChanges` with concise plain-language descriptions when a diff alone cannot explain the user impact.
 
 The menu's initial state is marked "Stability not recorded": only the changed accessibility tree is polled until stable. The menu verdict checks the observed button name, expanded state, menu role, four items, and axe findings; it is separate from whether the Playwright test passed as expected.
-
-## Error summary on submit
-New scenarios added to the manifest automatically receive generated tests without requiring framework code changes.
-
-To run the generated tests:
-
-```bash
-npx playwright test tests/generated-scenarios.spec.mts --project=chromium
-```
-
-These tests assist the existing scenario-specific tests which perform additional checks for keyboard navigation, focus management, and DOM changes.
 
 ## How it works
 
@@ -162,20 +160,6 @@ axe column: rules axe flags in the **broken** variant, according to the test sit
 
 The full results for each scenario, with before/after tables, are in [docs/scenarios.md](docs/scenarios.md).
 
-- `playwright.config.ts`: points Playwright at Team Y's site (`baseURL`) and defines the `chromium` (automatic) and `manual` projects.
-- `tests/menu.spec.ts`: the menu tests.
-- `tests/loading.spec.ts`: the loading indicator tests.
-- `tests/submission-confirmation.spec.ts`: the submission confirmation tests.
-- `tests/inline-validation.spec.ts`: checks blur-triggered error feedback for accessible and broken variants, including the live DOM changes and axe scans. The semantic WCAG checks are asserted directly because axe cannot infer whether an error message belongs to a field.
-- `tests/helpers/axe.ts`: `runAxe()` (scan + report attachment) and `diffViolations()` (violations that are new since the before scan).
-- `tests/helpers/watch-dom.ts`: `watchDom()`, a MutationObserver in the page that reports each change back to the test, and `waitFor()`, which waits until the change we expect has been recorded (or fails after a timeout, listing everything it saw).
-  - `watchDom(page)` watches the whole `<body>`, for pages whose structure you don't know in advance. `watchDom(page, selector)` only watches inside that element. The scenario specs all pass a selector.
-  - Each change names the element it happened on: `tag#id` if the element has an id, otherwise `tag[data-testid="x"]` if it has a testid, otherwise just `tag`.
-  - Focus moves are recorded in the same list, because moving focus changes no DOM and the observer can't see it. When focus lands on an element inside the watched root (by script or by keyboard), a change with `type: "focus"` is added: `target` is the newly focused element, `oldValue` is the element that had focus before (`null` if none or `<body>`), and `attributeName`, `text`, `added` and `removed` are empty. Changes stay in the order they happened, so a focus move made right after a DOM change comes after it in the list.
-  - Playwright's `.click()` focuses the element it clicks, so a click usually records a focus change before the DOM changes it causes.
-  - Not recorded: focus moving outside the watched root, focus dropped to `<body>` when the focused element is removed (no focus event fires for that), and focus inside iframes or shadow DOM.
-  - One watcher per page: calling `watchDom` twice on the same page throws.
-- `tests/watch-dom.spec.ts`: unit tests for `watchDom()`, tagged `@unit`. They build their own pages with `page.setContent`, so they don't need Team Y's site. Run them alone with `npx playwright test --grep @unit --project=chromium`.
 ## Repository layout
 
 ```

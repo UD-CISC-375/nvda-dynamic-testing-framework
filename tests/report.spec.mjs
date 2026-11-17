@@ -63,7 +63,7 @@ test("generated report works offline and is keyboard accessible", async ({
         { exact: true },
       ),
     ).toBeVisible();
-    await expect(page.getByText("Axe cannot detect this flaw")).toHaveCount(2);
+    await expect(page.getByText("Axe cannot detect this flaw")).toHaveCount(0);
 
     const rawJson = page.locator("details");
     await expect(rawJson).not.toHaveAttribute("open", "");
@@ -107,6 +107,7 @@ test("reports new and resolved findings and unrecorded scenarios", async ({ page
       scenario: "unrecorded",
       variant: "broken",
       verdict: "skipped",
+      nvdaOnly: true,
       skippedReason: "The test did not record its states.",
       states: [],
     });
@@ -126,6 +127,7 @@ test("reports new and resolved findings and unrecorded scenarios", async ({ page
     }
     await expect(page.getByText("Skipped: The test did not record its states.")).toBeVisible();
     await expect(page.getByText("No states were recorded for this scenario.")).toBeVisible();
+    await expect(page.getByText("Axe cannot detect this flaw")).toHaveCount(1);
   } finally {
     rmSync(outputDir, { recursive: true, force: true });
   }

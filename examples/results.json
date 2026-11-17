@@ -6,10 +6,10 @@
     "siteUrl": "https://UD-CISC-375.github.io/nvda-dynamic-testing-webpage/",
     "scenarios": [
       {
-        "scenario": "menu",
+        "scenario": "disclosure-menu",
         "variant": "accessible",
         "verdict": "passed",
-        "nvdaOnly": true,
+        "nvdaOnly": false,
         "states": [
           {
             "index": 0,
@@ -84,10 +84,10 @@
         ]
       },
       {
-        "scenario": "menu",
+        "scenario": "disclosure-menu",
         "variant": "broken",
         "verdict": "failed",
-        "nvdaOnly": true,
+        "nvdaOnly": false,
         "states": [
           {
             "index": 0,

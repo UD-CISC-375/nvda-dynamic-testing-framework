@@ -14,9 +14,6 @@ export default defineConfig({
   reporter: [
     ['list'],
     ['html', { open: isCI ? 'never' : 'always' }],
-    ...(process.env.ACCESSIBILITY_RESULTS_PATH
-      ? [['./tests/helpers/results-reporter.ts'] as [string]]
-      : []),
     ['./reporters/results-reporter.ts'],
   ],
   use: {
