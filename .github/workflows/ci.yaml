@@ -29,6 +29,15 @@ jobs:
       - name: Check out framework repository
         uses: actions/checkout@v4
 
+      - name: Reject test.fail() in specs
+        run: |
+          if git grep -n -E 'test[[:space:]]*\.[[:space:]]*fail[[:space:]]*\(' -- \
+            '*.spec.ts' '*.spec.tsx' '*.spec.js' \
+            '*.test.ts' '*.test.tsx' '*.test.js'; then
+            echo "::error::test.fail() is not allowed in specs."
+            exit 1
+          fi
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
