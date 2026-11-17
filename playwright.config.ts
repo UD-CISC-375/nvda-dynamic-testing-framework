@@ -43,4 +43,5 @@ export default defineConfig({
       timeout: 120_000, // per test; leaves time to find and click the button
     },
   ],
+  failOnFlakyTests: !!process.env.CI,
 });
