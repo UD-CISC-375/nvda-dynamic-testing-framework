@@ -58,6 +58,7 @@ Decisions the team has made (Sprint 3). They are implemented by the classifier i
 |---|---|
 | Node added or removed | Meaningful |
 | Node moves to a new parent | Meaningful |
+| Chromium newly hides or exposes something the snapshot doesn't agree with ([#137](https://github.com/UD-CISC-375/nvda-dynamic-testing-framework/issues/137)) | Meaningful |
 | Text changes inside an existing node | Recorded |
 | State-only change (e.g. `aria-expanded`) | Recorded |
 | Reordering (e.g. sorting a table) | Recorded |
