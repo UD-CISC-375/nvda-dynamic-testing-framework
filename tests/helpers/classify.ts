@@ -1,5 +1,7 @@
 // Import only the TreeChange type (the diff entries that classify labels).
 import type { TreeChange } from "./diff-trees";
+// CdpChange (#137): the CDP-side counterpart to TreeChange, from createExposureTracker.
+import type { CdpChange } from "./track-exposure";
 
 // What the definition (#124) says to do with a change. Meaningful: a new state, scanned by axe.
 // Recorded: logged on the current state, with no new state and no scan. Ignored: dropped.
@@ -26,6 +28,13 @@ export const RULES = {
   // Returning to an earlier state: the page is somewhere already scanned, so every tree change
   // is only logged, whatever its kind. Focus changes are still judged on their own.
   "tree:matchesState": { label: "recorded" },
+  // An exposure change (#137): Chromium newly hides or exposes something the snapshot doesn't
+  // agree with. Same reasoning as tree:added/removed -- assistive tech sees something different
+  // now, a new state.
+  "cdp:exposureChanged": { label: "meaningful" },
+  // Returning to an earlier state, cdp side: same rule as tree:matchesState, for the same reason
+  // -- the state itself isn't new, only logged, whatever the cdp change's kind.
+  "cdp:matchesState": { label: "recorded" },
   // The focused element was removed and focus fell to <body> (#116): the user lost their place.
   "focus:lost": { label: "meaningful" },
   // Focus moved somewhere the user didn't send it, e.g. into a dialog or back to the opener.
@@ -37,9 +46,12 @@ export const RULES = {
   // iframe contents → ignored. No row needed: default-mode snapshots don't go into iframes, so
   // those changes never reach classify ("changes inside an iframe produce no TreeChange" in
   // tests/aria-tree.spec.ts fails if that stops being true).
-  // The first Record makes TypeScript demand a row for every TreeChange kind; the second
-  // lets rows that aren't tree kinds sit in the same table.
-} as const satisfies Record<`tree:${TreeChange["kind"]}`, Rule> & Record<string, Rule>;
+  // The first two Records make TypeScript demand a row for every TreeChange and CdpChange
+  // kind; the third lets rows that aren't tree or cdp kinds (e.g. the matchesState rows,
+  // and every focus: row) sit in the same table.
+} as const satisfies Record<`tree:${TreeChange["kind"]}`, Rule> &
+  Record<`cdp:${CdpChange["kind"]}`, Rule> &
+  Record<string, Rule>;
 
 // The key of one table row.
 export type Reason = keyof typeof RULES;
@@ -84,7 +96,7 @@ export type FocusChange = {
 
 // One change with the label its row gave it.
 export type ClassifiedChange = {
-  change: TreeChange | FocusChange;
+  change: TreeChange | FocusChange | CdpChange;
   label: Label;
   reason: Reason;
   // Only on rows whose decision is still pending.
@@ -104,12 +116,14 @@ export type ClassifyInput = {
   diff: TreeChange[];
   // watchDom's focus and focusLost records since the last entry, in the order they happened.
   focusChanges?: FocusChange[];
+  // Exposure changes from createExposureTracker.poll() (#137), for this entry's settled state.
+  cdpChanges?: CdpChange[];
   // Set when the new tree's fingerprint matches an earlier state's.
   matchesState?: boolean;
 };
 
 // Attach a table row's label (and provisional flag, if it has one) to a change.
-function labelled(change: TreeChange | FocusChange, reason: Reason): ClassifiedChange {
+function labelled(change: TreeChange | FocusChange | CdpChange, reason: Reason): ClassifiedChange {
   // Widen to Rule so `provisional` can be read on every row, not only the ones that have it.
   const rule: Rule = RULES[reason];
   // Leave the key out entirely on decided rows, so reports only show it where it matters.
@@ -121,13 +135,20 @@ function labelled(change: TreeChange | FocusChange, reason: Reason): ClassifiedC
 // Label every change in one entry with the definition's table. A pure function: an empty
 // input just gives meaningful: false. Whether an empty diff makes a new state is the
 // tracker's call (#130), not this one's.
-export function classify({ diff, focusChanges = [], matchesState = false }: ClassifyInput): Classification {
+export function classify({
+  diff,
+  focusChanges = [],
+  cdpChanges = [],
+  matchesState = false,
+}: ClassifyInput): Classification {
   // Back at an earlier state, one row covers every tree change; otherwise the row is the kind's.
   const tree = diff.map((c) => labelled(c, matchesState ? "tree:matchesState" : `tree:${c.kind}`));
+  // Same rule, cdp side: matchesState means the state itself isn't new, however this changed.
+  const cdp = cdpChanges.map((c) => labelled(c, matchesState ? "cdp:matchesState" : `cdp:${c.kind}`));
   // Focus is judged on its own: matchesState comes from the tree, which holds no focus.
   const focus = focusChanges.map((c) => labelled(c, focusReason(c)));
-  // Tree changes first, then focus changes, each in the order they came in.
-  const changes = [...tree, ...focus];
+  // Tree changes first, then cdp changes, then focus changes, each in the order they came in.
+  const changes = [...tree, ...cdp, ...focus];
   return { meaningful: changes.some((c) => c.label === "meaningful"), changes };
 }
 
