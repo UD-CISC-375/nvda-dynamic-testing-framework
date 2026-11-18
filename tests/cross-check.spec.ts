@@ -51,7 +51,7 @@ test.describe("crossCheck: hiddenByBrowser", () => {
     };
     const refMap = new Map([["e1", 10], ["e2", 11]]);
     expect(crossCheck(tree, cdpTree, refMap)).toEqual([
-      { kind: "hiddenByBrowser", path: 'generic "Background"', ref: "e1", reasons: ["activeModalDialog"] },
+      { kind: "hiddenByBrowser", path: 'generic "Background"', ref: "e1", backendNodeId: 10, reasons: ["activeModalDialog"] },
     ]);
   });
 
