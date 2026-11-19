@@ -24,6 +24,13 @@ export type HiddenByBrowser = {
   // walking the SNAPSHOT tree, since that's the side this mismatch is about.
   path: string;
   ref?: string;
+  // The CDP node this mismatch is about. walkHidden already resolves this
+  // via refMap to look the node up in `ignored`; kept on the output (added
+  // for #137) so a mismatch can be matched to itself across polls the way
+  // #127's TreeChange is matched by path -- a backendNodeId is stable
+  // within one document the same way, and doesn't shift when siblings
+  // reorder the way a path's "[n]" suffix can.
+  backendNodeId: number;
   // Chromium's own ignoredReasons for this node, verbatim (e.g.
   // "inertElement", "ariaHiddenElement", "activeModalDialog", ...) --
   // crossCheck never renames or guesses at these.
@@ -206,7 +213,7 @@ function walkHidden(
       if (backendNodeId !== undefined && !cdpById.has(backendNodeId)) {
         const ig = ignored.get(backendNodeId);
         if (ig && !hasExposedDescendant(node.children, refMap, cdpById)) {
-          out.push({ kind: "hiddenByBrowser", path, ref: node.ref, reasons: ig.reasons });
+          out.push({ kind: "hiddenByBrowser", path, ref: node.ref, backendNodeId, reasons: ig.reasons });
           // Reported once, at its root: a subtree's descendants are
           // presumed hidden along with it, so they aren't walked (and
           // separately reported) here too.

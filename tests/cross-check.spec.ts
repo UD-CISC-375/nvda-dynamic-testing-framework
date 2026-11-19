@@ -15,6 +15,8 @@ import { snapshotTree } from "./helpers/aria-tree";
 import { getCdpTree, CdpTreeNode, IgnoredNode } from "./helpers/cdp-tree";
 import { createCdpLink, resolveElement, resolveRefs, CdpLink } from "./helpers/cdp-link";
 import { loadScenarios, SetupStep } from "./helpers/scenarios";
+import { createExposureTracker } from "./helpers/track-exposure";
+import { classify, FocusChange } from "./helpers/classify";
 
 // Same guard cdp.spec.ts uses: CDP only exists on Chromium, and the repo
 // only configures Chromium projects, so this should never actually skip --
@@ -51,7 +53,7 @@ test.describe("crossCheck: hiddenByBrowser", () => {
     };
     const refMap = new Map([["e1", 10], ["e2", 11]]);
     expect(crossCheck(tree, cdpTree, refMap)).toEqual([
-      { kind: "hiddenByBrowser", path: 'generic "Background"', ref: "e1", reasons: ["activeModalDialog"] },
+      { kind: "hiddenByBrowser", path: 'generic "Background"', ref: "e1", backendNodeId: 10, reasons: ["activeModalDialog"] },
     ]);
   });
 
@@ -427,6 +429,100 @@ test.describe("crossCheck: live site", () => {
 
     const result = await crossCheckLive(link, scope);
     expect(result).toEqual([]);
+  });
+});
+
+test.describe("createExposureTracker + classify: live site", () => {
+  // #137's two showModal() ACs, run against the same real Chromium + CDP wiring as the
+  // "crossCheck: live site" tests above, with crossCheckLive's output fed through a real
+  // createExposureTracker across polls and the result through the real classify(). Opening
+  // reports the newly-hidden background as exposureChanged (direction "hidden"), classified
+  // meaningful; closing reports those same mismatches resolving (direction "exposed"),
+  // classified cdp:matchesState -- the page is back to a state already seen -- with the
+  // entry still meaningful on its own, through the focus move back to the opener
+  // (focus:page-moved, the same row classify.spec.ts's "page returns focus to the opening
+  // button after Escape" scenario uses for the tree side).
+  test("opening a native <dialog> reports the background's new hiddenByBrowser mismatches as exposureChanged, direction hidden, classified meaningful", async ({ page }) => {
+    await page.setContent(`
+      <main>
+        <button id="opener">Open</button>
+        <p id="bg">Background content</p>
+        <dialog id="d"><p>Dialog content</p><button id="close">Close</button></dialog>
+      </main>`);
+    const link = await createCdpLink(page);
+    requireLink(link);
+
+    const tracker = createExposureTracker();
+    const baseline = await crossCheckLive(link, page.locator("body"));
+    expect(tracker.poll(baseline)).toEqual([]); // establishes the baseline; nothing to report yet
+
+    await page.locator("#opener").focus();
+    await page.locator("#d").evaluate((d: HTMLDialogElement) => d.showModal());
+    await expect(page.locator("#d")).toBeVisible();
+
+    const afterOpen = await crossCheckLive(link, page.locator("body"));
+    const changes = tracker.poll(afterOpen);
+
+    expect(changes.length).toBeGreaterThan(0);
+    for (const c of changes) expect(c).toMatchObject({ kind: "exposureChanged", direction: "hidden" });
+
+    const result = classify({ diff: [], cdpChanges: changes });
+    expect(result.meaningful).toBe(true);
+    for (const c of result.changes) expect(c).toMatchObject({ label: "meaningful", reason: "cdp:exposureChanged" });
+  });
+
+  test("closing it again reports the same mismatches resolving, direction exposed, classified cdp:matchesState, entry still meaningful via the focus move back to the opener", async ({ page }) => {
+    await page.setContent(`
+      <main>
+        <button id="opener">Open</button>
+        <p id="bg">Background content</p>
+        <dialog id="d"><p>Dialog content</p><button id="close">Close</button></dialog>
+      </main>`);
+    const link = await createCdpLink(page);
+    requireLink(link);
+
+    const tracker = createExposureTracker();
+    tracker.poll(await crossCheckLive(link, page.locator("body"))); // baseline
+
+    await page.locator("#opener").focus();
+    await page.locator("#d").evaluate((d: HTMLDialogElement) => d.showModal());
+    await expect(page.locator("#d")).toBeVisible();
+    tracker.poll(await crossCheckLive(link, page.locator("body"))); // opening itself isn't under test here
+
+    // The dialog's own close() restores focus to whatever had it before showModal() was
+    // called (the HTML spec's "previously focused element" behavior) -- #opener, focused
+    // just above -- without the user doing anything themselves to send it there. Confirmed
+    // against the real page rather than assumed, since the classify() call below stands in
+    // for it with a hand-built FocusChange (see the comment there).
+    await page.locator("#d").evaluate((d: HTMLDialogElement) => d.close());
+    await expect(page.locator("#d")).toBeHidden();
+    await expect(page.locator("#opener")).toBeFocused();
+
+    const afterClose = await crossCheckLive(link, page.locator("body"));
+    const changes = tracker.poll(afterClose);
+
+    expect(changes.length).toBeGreaterThan(0);
+    for (const c of changes) expect(c).toMatchObject({ kind: "exposureChanged", direction: "exposed" });
+
+    // Hand-built the same way classify.spec.ts's own focus fixtures are -- that file never
+    // drives a real page (see its header comment) -- rather than wiring up watchDom here,
+    // which is its own mechanism and out of #137's scope. Shaped to match what was just
+    // confirmed above: focus landed on #opener, which last held it before the dialog's own
+    // close() moved it there, with no user action of its own explaining the move.
+    const movedBackToOpener: FocusChange = {
+      type: "focus",
+      target: "button#opener",
+      oldValue: "button#close",
+      lastAction: null,
+      relation: "unrelated",
+    };
+    const result = classify({ diff: [], cdpChanges: changes, focusChanges: [movedBackToOpener], matchesState: true });
+
+    expect(result.meaningful).toBe(true);
+    for (const c of result.changes.filter((c) => c.change !== movedBackToOpener)) {
+      expect(c).toMatchObject({ label: "recorded", reason: "cdp:matchesState" });
+    }
+    expect(result.changes.at(-1)).toMatchObject({ label: "meaningful", reason: "focus:page-moved" });
   });
 });
 

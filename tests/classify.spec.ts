@@ -13,6 +13,7 @@ import { classify, FOLLOW_WINDOW_MS } from "./helpers/classify";
 // Types for the hand-built changes and the expected labels.
 import type { Classification, FocusChange, Label } from "./helpers/classify";
 import type { TreeChange } from "./helpers/diff-trees";
+import type { ExposureChanged } from "./helpers/track-exposure";
 
 // A paragraph subtree for the entries that carry one.
 const paragraph = buildTree(`- paragraph [ref=e3]: Saved`)[0];
@@ -32,6 +33,16 @@ const sample: Record<TreeChange["kind"], TreeChange> = {
   },
   nameChanged: { kind: "nameChanged", path: 'button "Pause"', ref: "e2", before: "Play", after: "Pause" },
   reordered: { kind: "reordered", path: "table > rowgroup", ref: "e7", order: [1, 0] },
+};
+
+// A hand-built exposure change (#137), shaped the way createExposureTracker.poll() reports them.
+const exposureChanged: ExposureChanged = {
+  kind: "exposureChanged",
+  path: 'generic "Background"',
+  ref: "e1",
+  backendNodeId: 10,
+  direction: "hidden",
+  reasons: ["activeModalDialog"],
 };
 
 // A focus record as the tracker will pass it: a page-made move with no user action, unless
@@ -78,6 +89,30 @@ test.describe("classify: tree changes by kind", () => {
     for (const kind of decided) {
       expect(classify({ diff: [sample[kind]] }).changes[0]).not.toHaveProperty("provisional");
     }
+  });
+});
+
+test.describe("classify: cdp changes", () => {
+  // Chromium hiding or exposing something the snapshot doesn't agree with is a new state,
+  // same as a node being added to or removed from the tree.
+  test("exposureChanged → meaningful", () => {
+    const result = classify({ diff: [], cdpChanges: [exposureChanged] });
+    expect(result.changes).toEqual([{ change: exposureChanged, label: "meaningful", reason: "cdp:exposureChanged" }]);
+    expect(result.meaningful).toBe(true);
+  });
+
+  // Back at an earlier state, cdp changes are logged the same way tree changes are.
+  test("uses cdp:matchesState when matchesState is set", () => {
+    const result = classify({ diff: [], cdpChanges: [exposureChanged], matchesState: true });
+    expect(result.changes).toEqual([{ change: exposureChanged, label: "recorded", reason: "cdp:matchesState" }]);
+    expect(result.meaningful).toBe(false);
+  });
+
+  // Tree changes first, then cdp changes, then focus changes, each group in the order it came in.
+  test("lists cdp changes after tree changes and before focus changes", () => {
+    const moved = focus();
+    const result = classify({ diff: [sample.textChanged], cdpChanges: [exposureChanged], focusChanges: [moved] });
+    expect(result.changes.map((c) => c.change)).toEqual([sample.textChanged, exposureChanged, moved]);
   });
 });
 
