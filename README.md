@@ -70,8 +70,6 @@ The HTML report opens automatically after a local run. Press Ctrl+C to stop the 
 The framework includes a generated test runner that reads scenario
 data from Team Y's `scenarios.json` manifest.
 
-The framework includes a generated test runner that reads scenario data from Team Y's `scenarios.json` manifest.
-
 The runner automatically creates tests for both the accessible and broken variants of each scenario. It executes the setup steps defined in the manifest and runs axe-core accessibility checks.
 
 - Accessible variants must have no axe violations.
@@ -80,8 +78,8 @@ The runner automatically creates tests for both the accessible and broken varian
 - Scenarios marked `nvdaOnly` are skipped with the reason
   "needs a screen reader check", since axe alone cannot
   verify their accessibility issues.
-
-New scenarios added to the manifest automatically receive generated tests without requiring framework code changes.
+- New scenarios added to the manifest automatically receive generated tests
+  without requiring framework code changes.
 
 To run the generated tests:
 
@@ -90,6 +88,30 @@ npx playwright test tests/generated-scenarios.spec.mts --project=chromium
 ```
 
 These tests assist the existing scenario-specific tests which perform additional checks for keyboard navigation, focus management, and DOM changes.
+
+## Generate an offline results report
+
+Generate a single HTML file from a `results.json` file:
+
+```sh
+npm run report:html -- results.json report.html
+```
+
+The report is self-contained: open `report.html` directly from disk or from a CI artifact; it does not need a web server or network access. It puts the verdict for each scenario and variant first, then shows the state timeline, accessibility-tree changes, and new/resolved axe findings. The full source JSON is available in a collapsed disclosure at the bottom.
+
+The Playwright reporter writes structured results to
+`results/output/results.json`. Generate the standalone report with:
+
+```sh
+npm test
+npm run report:html -- results/output/results.json results-report.html
+```
+
+CI publishes `offline-results-report-build` and `offline-results-report-live` artifacts using results from the corresponding test run. Currently only the menu accessibility-tree tests record structured results; other scenarios are not represented in that report. `examples/results.json` remains available for testing the renderer.
+
+For complete findings, each entry in `axe.new` and `axe.resolved` must include the axe `rule`, `target`, `help`, HTTPS `helpUrl`, `failureSummary`, and `html` fields; the generator rejects incomplete findings. The initial state's `axe.new` contains findings present in the baseline scan. The report's NVDA-only warning follows `axe.nvdaOnly` in the test site's manifest; a clean axe result does not by itself mean the scenario is accessible. Accessibility-tree change records may include `role` and `name` so the report can describe changes in terms developers and screen-reader users recognize. A state may also provide `assistiveTechChanges` with concise plain-language descriptions when a diff alone cannot explain the user impact.
+
+The menu's initial state is marked "Stability not recorded": only the changed accessibility tree is polled until stable. The menu verdict checks the observed button name, expanded state, menu role, four items, and axe findings; it is separate from whether the Playwright test passed as expected.
 
 ## How it works
 

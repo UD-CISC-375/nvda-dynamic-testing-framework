@@ -5,6 +5,7 @@ export interface Results {
     timestamp: string;
     commit: string;
     siteUrl: string;
+    scope?: string;
     scenarios: ScenarioResult[];
   };
 }
@@ -12,6 +13,9 @@ export interface Results {
 export type ScenarioResult = {
   scenario: string;
   variant: string;
+  /** Marks checks whose accessibility behavior cannot be assessed by axe alone. */
+  nvdaOnly?: boolean;
+  executionNote?: string;
   states: StateResult[];
 } & (
   | { verdict: "passed" | "failed"; skippedReason?: never }
@@ -22,13 +26,15 @@ export interface StateResult {
   index: number;
   trigger: string;
   domChangeSummary: string;
+  /** Optional wording for user-facing effects that a structural tree diff cannot explain. */
+  assistiveTechChanges?: string[];
   treeDiff: TreeDiff;
   axe: {
     new: AxeViolation[];
     resolved: AxeViolation[];
     totalCount: number;
   };
-  stable: boolean;
+  stable: boolean | null;
 }
 
 export type JsonValue =
@@ -50,6 +56,9 @@ export interface TreeDiff {
   removed: SubtreeChange[];
   changed: {
     nodeId: string;
+    /** Optional accessible-tree metadata used to describe a change in plain language. */
+    role?: string;
+    name?: string;
     properties: {
       name: string;
       before?: JsonValue;
@@ -72,4 +81,10 @@ export interface SubtreeChange {
 export interface AxeViolation {
   rule: string;
   target: JsonValue[];
+  impact?: string;
+  /** axe's rule summary, documentation URL, failure details, and affected HTML. */
+  help: string;
+  helpUrl: string;
+  failureSummary: string;
+  html: string;
 }

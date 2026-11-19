@@ -1,7 +1,10 @@
 // Import Playwright's test runner, assertion library, and the Page/TestInfo types.
 import { test, expect, Page, TestInfo } from "@playwright/test";
 // Import the helpers that snapshot, diff, wait on, and attach accessibility trees.
+import { runAxe } from "./helpers/axe";
+import { attachMenuResult, captureMenuSnapshot } from "./helpers/menu-results";
 import { snapshotTree, diffTree, waitForTreeChange, attachTreeDiff, refOf } from "./helpers/aria-tree";
+import { loadScenarios } from "./helpers/scenarios";
 
 // Duplicated from menu.spec.ts on purpose; importing from a spec file would register its tests.
 // Build the hash route for the menu demo page, selecting the accessible or broken variant.
@@ -27,7 +30,16 @@ async function clickTrigger(page: Page, testInfo: TestInfo) {
 // Generate one test per variant so both the accessible and broken menus are checked.
 for (const variant of ["accessible", "broken"] as const) {
   // Define a test whose name includes the variant; receives the page fixture and test metadata.
-  test(`${variant}: accessibility-tree diff detects the menu opening`, async ({ page }, testInfo) => {
+  test(`${variant}: accessibility-tree diff detects the menu opening`, {
+    annotation: { type: "accessibility-scenario", description: `menu:${variant}` },
+  }, async ({ page, request }, testInfo) => {
+    const menuScenario = (await loadScenarios(request)).find(
+      (scenario) => scenario.path === "/disclosure/menu",
+    );
+    if (!menuScenario) {
+      throw new Error("The scenario manifest does not contain /disclosure/menu");
+    }
+
     // Navigate to the menu demo page for this variant.
     await page.goto(menuUrl(variant));
     // Make sure the trigger button has rendered before taking any snapshot.
@@ -36,6 +48,10 @@ for (const variant of ["accessible", "broken"] as const) {
     // Snapshot the whole page rather than just the menu.
     const scope = page.locator("body"); // whole page: the diff should still contain only menu lines
 
+    // Record the same states used by this test so the report describes observed results.
+    const trigger = page.getByTestId("trigger");
+    const beforeAxe = await runAxe(page, testInfo, "before");
+    const beforeResult = await captureMenuSnapshot(trigger, beforeAxe);
     // Capture the accessibility tree before the menu is opened.
     const before = await snapshotTree(scope);
     // Open the menu (manually or automatically depending on the project).
@@ -43,6 +59,25 @@ for (const variant of ["accessible", "broken"] as const) {
     // Poll until the accessibility tree changes and settles, then capture it.
     const after = await waitForTreeChange(scope, before);
     // Compute which tree lines were added and removed by opening the menu.
+    const afterAxe = await runAxe(page, testInfo, "after");
+    const afterResult = await captureMenuSnapshot(trigger, afterAxe);
+    await attachMenuResult(
+      testInfo,
+      menuScenario,
+      variant,
+      beforeResult,
+      afterResult,
+      page.getByTestId("menu"),
+    );
+    const resultAttachment = testInfo.attachments.find(
+      (attachment) => attachment.name === "accessibility-scenario.json",
+    );
+    if (!resultAttachment?.body) {
+      throw new Error("The accessibility scenario result was not attached");
+    }
+    expect(JSON.parse(resultAttachment.body.toString()).nvdaOnly).toBe(
+      menuScenario.axe.nvdaOnly,
+    );
     const diff = diffTree(before.content, after.content);
 
     // Log the full before and after content trees for debugging.
