@@ -1,5 +1,5 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
-import { runAxe } from "./helpers/axe";
+import { runAxe, scanAxe } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
 
 const dialogUrl = (variant: "accessible" | "broken") =>
@@ -7,15 +7,6 @@ const dialogUrl = (variant: "accessible" | "broken") =>
 
 const dialogInserted = (changes: DomChange[]) =>
   changes.some((change) => change.type === "childList" && change.added.length > 0);
-
-const dialogAxeTags = [
-  "wcag2a",
-  "wcag2aa",
-  "wcag21a",
-  "wcag21aa",
-  "wcag22aa",
-  "best-practice",
-];
 
 async function openDialog(page: Page, testInfo: TestInfo) {
   if (testInfo.project.name === "manual") {
@@ -43,7 +34,7 @@ test("accessible: opening the dialog is detected, keyboard managed, and axe clea
 ) => {
   await page.goto(dialogUrl("accessible"));
 
-  const before = await runAxe(page, testInfo, "before", dialogAxeTags);
+  const before = await runAxe(page, testInfo, "before");
   expect(before.map((violation) => violation.id)).toEqual([]);
 
   const watcher = await watchDom(page, ".scenario");
@@ -66,7 +57,7 @@ test("accessible: opening the dialog is detected, keyboard managed, and axe clea
   await expect(dialog).toBeHidden();
   await expect(page.getByTestId("trigger")).toBeFocused();
 
-  const after = await runAxe(page, testInfo, "after", dialogAxeTags);
+  const after = await runAxe(page, testInfo, "after");
   expect(after.map((violation) => violation.id)).toEqual([]);
 });
 
@@ -76,7 +67,7 @@ test("broken: dialog insertion is detected but name and keyboard management are 
 ) => {
   await page.goto(dialogUrl("broken"));
 
-  const before = await runAxe(page, testInfo, "before", dialogAxeTags);
+  const before = await runAxe(page, testInfo, "before");
   expect(before.map((violation) => violation.id)).toEqual([]);
 
   const watcher = await watchDom(page, ".scenario");
@@ -95,6 +86,7 @@ test("broken: dialog insertion is detected but name and keyboard management are 
   await page.keyboard.press("Escape");
   await expect(dialog).toBeVisible();
 
-  const after = await runAxe(page, testInfo, "after", dialogAxeTags);
-  expect(after.map((violation) => violation.id)).toContain("aria-dialog-name");
+  // axe tags `aria-dialog-name` as best-practice only, so it arrives as a warning.
+  const after = await scanAxe(page, testInfo, "after");
+  expect(after.warnings.map((violation) => violation.id)).toContain("aria-dialog-name");
 });

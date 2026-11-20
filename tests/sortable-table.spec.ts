@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
-import AxeBuilder from '@axe-core/playwright';
+import { runAxe } from './helpers/axe';
 
 test.describe('Sortable Table Scenario', () => {
   
-  test('accessible variant - keyboard driven navigation and ARIA attributes', async ({ page, baseURL }) => {
+  test('accessible variant - keyboard driven navigation and ARIA attributes', async ({ page, baseURL }, testInfo) => {
     // 1. Open accessible variant (use baseURL from config or fallback to local dev server)
     const host = baseURL || 'http://localhost:5173';
     await page.goto(`${host}/#/dynamic/sortable-table?variant=accessible`);
@@ -46,12 +46,12 @@ test.describe('Sortable Table Scenario', () => {
     await expect(nameHeader).not.toHaveAttribute('aria-sort');
     await expect(page.locator('th[aria-sort]')).toHaveCount(1);
 
-    // 9. Axe accessibility audit
-    const axeResults = await new AxeBuilder({ page }).analyze();
-    expect(axeResults.violations).toEqual([]);
+    // 9. Axe audit: scans WCAG + best-practice, returns only WCAG failures; also attaches axe-after.json for the reporter.
+    const violations = await runAxe(page, testInfo, 'after');
+    expect(violations).toEqual([]);
   });
 
-  test('broken variant - verifies keyboard/ARIA failures while functional sort works', async ({ page, baseURL }) => {
+  test('broken variant - verifies keyboard/ARIA failures while functional sort works', async ({ page, baseURL }, testInfo) => {
     // 1. Open broken variant
     const host = baseURL || 'http://localhost:5173';
     await page.goto(`${host}/#/dynamic/sortable-table?variant=broken`);
@@ -77,8 +77,9 @@ test.describe('Sortable Table Scenario', () => {
     const headersWithSort = page.locator('th[aria-sort]');
     await expect(headersWithSort).toHaveCount(0);
 
-    const axeResults = await new AxeBuilder({ page }).analyze();
-    expect(axeResults.violations).toEqual([]);
+    // Same shared scan as the accessible test.
+    const violations = await runAxe(page, testInfo, 'after');
+    expect(violations).toEqual([]);
   });
 
 });

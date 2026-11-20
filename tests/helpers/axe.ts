@@ -1,49 +1,52 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page, TestInfo } from "@playwright/test";
 import type { Result } from "axe-core";
+// The fail/warn policy lives in axe-policy.ts so the reporter can use it without loading Playwright.
+import { SCAN_TAGS, isWcagViolation, splitViolations } from "./axe-policy";
 
-// Only run the rules that map to WCAG 2.0/2.1/2.2 levels A and AA, plus best-practice checks.
-// A: WCAG minimum baseline
-// AA: WCAG Standard Benchmark
-
-export const WCAG_TAGS = [
-  "wcag2a",
-  "wcag2aa",
-  "wcag21a",
-  "wcag21aa",
-  "wcag22a",
-  "wcag22aa",
-  "best-practice",
-];
+// Re-exported so existing imports from helpers/axe keep working; SCAN_TAGS stays internal.
+export { WCAG_TAGS, isWcagViolation, splitViolations } from "./axe-policy";
 
 /**
- * Runs axe against the page as it is *right now* and returns the violations.
+ * Runs axe against the page as it is *right now* and returns
+ * `{ failures, warnings }`. Use it when a spec needs to assert on a
+ * best-practice finding (e.g. the broken dialog's `aria-dialog-name`);
+ * otherwise use runAxe.
  * `label` (e.g. "before" / "after") names the report attachment so we can
  * tell scans of the same page apart.
  */
-export async function runAxe(
-  page: Page,
-  testInfo: TestInfo,
-  label: string,
-  tags: string[] = WCAG_TAGS,
-) {
-  const results = await new AxeBuilder({ page }).withTags(tags).analyze();
+export async function scanAxe(page: Page, testInfo: TestInfo, label: string) {
+  // One scan covers both lists; the split happens afterwards, by tag.
+  const results = await new AxeBuilder({ page }).withTags(SCAN_TAGS).analyze();
+  const { failures, warnings } = splitViolations(results.violations);
 
-  // Short summary in the terminal: one line per broken rule.
-  console.log(`[axe ${label}] ${results.violations.length} violation(s)`);
+  // Short summary in the terminal: one line per broken rule, warnings marked.
+  console.log(
+    `[axe ${label}] ${failures.length} violation(s), ${warnings.length} warning(s)`,
+  );
   for (const v of results.violations) {
+    const kind = isWcagViolation(v) ? "-" : "- [warn]";
     console.log(
-      `  - ${v.id} (${v.impact}): ${v.nodes.length} element(s) - ${v.help}`,
+      `  ${kind} ${v.id} (${v.impact}): ${v.nodes.length} element(s) - ${v.help}`,
     );
   }
 
-  // Full results go into the HTML report (npx playwright show-report).
+  // Full results, warnings included, go into the HTML report (npx playwright show-report).
   await testInfo.attach(`axe-${label}.json`, {
     body: JSON.stringify(results, null, 2),
     contentType: "application/json",
   });
 
-  return results.violations;
+  return { failures, warnings };
+}
+
+/**
+ * Runs the same scan as scanAxe and returns only the WCAG failures, which is
+ * what a test should fail on. Best-practice warnings are logged and attached
+ * but not returned.
+ */
+export async function runAxe(page: Page, testInfo: TestInfo, label: string) {
+  return (await scanAxe(page, testInfo, label)).failures;
 }
 
 /**

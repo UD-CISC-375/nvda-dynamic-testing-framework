@@ -31,15 +31,6 @@ const errorDisplayed = (changes: DomChange[]) =>
       change.added.some((added) => added === "p" || added.startsWith("p#") || added.startsWith("p[")),
   );
 
-const inlineValidationAxeTags = [
-  "wcag2a",
-  "wcag2aa",
-  "wcag21a",
-  "wcag21aa",
-  "wcag22a",
-  "wcag22aa",
-];
-
 async function triggerBlurValidation(page: Page) {
   await page.getByTestId("email").fill("not-an-email");
   await page.getByTestId("check").click();
@@ -68,12 +59,8 @@ test("accessible: blur validation exposes the error and stays axe-clean", async 
   await page.goto(inlineValidationUrl("accessible"));
   await expect(page.getByTestId("email")).toBeVisible();
 
-  const before = await runAxe(
-    page,
-    testInfo,
-    "before",
-    inlineValidationAxeTags,
-  );
+  // Shared axe policy: fails on WCAG A/AA only; best-practice is logged as a warning.
+  const before = await runAxe(page, testInfo, "before");
   expect(before.map((violation) => violation.id)).toEqual([]);
 
   const watcher = await watchDom(page, ".scenario");
@@ -96,12 +83,7 @@ test("accessible: blur validation exposes the error and stays axe-clean", async 
   // The visible message identifies the error without relying on the red border alone.
   await expect(email).toHaveClass("input-error");
 
-  const after = await runAxe(
-    page,
-    testInfo,
-    "after",
-    inlineValidationAxeTags,
-  );
+  const after = await runAxe(page, testInfo, "after");
   expect(after.map((violation) => violation.id)).toEqual([]);
 });
 
@@ -112,12 +94,8 @@ test("broken: blur validation shows an error without programmatic error semantic
   await page.goto(inlineValidationUrl("broken"));
   await expect(page.getByTestId("email")).toBeVisible();
 
-  const before = await runAxe(
-    page,
-    testInfo,
-    "before",
-    inlineValidationAxeTags,
-  );
+  // Shared axe policy: fails on WCAG A/AA only; best-practice is logged as a warning.
+  const before = await runAxe(page, testInfo, "before");
   expect(before.map((violation) => violation.id)).toEqual([]);
 
   const watcher = await watchDom(page, ".scenario");
@@ -133,12 +111,7 @@ test("broken: blur validation shows an error without programmatic error semantic
   await expect(email).not.toHaveAttribute("aria-invalid");
   await expect(email).not.toHaveAttribute("aria-describedby");
 
-  const after = await runAxe(
-    page,
-    testInfo,
-    "after",
-    inlineValidationAxeTags,
-  );
+  const after = await runAxe(page, testInfo, "after");
   // axe does not infer that the unassociated message is an error for this field.
   expect(after.map((violation) => violation.id)).toEqual([]);
 });
