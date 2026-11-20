@@ -2,6 +2,7 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
+import { trigger } from "./helpers/trigger";
 
 // WCAG 2.2 SC 4.1.3: Status Messages
 // Test both the accessible and broken polite status variants.
@@ -17,18 +18,13 @@ const announced = (text: string) => (changes: DomChange[]) =>
       change.inLiveRegion && change.text?.includes(text),
   );
 
-async function clickTrigger(page: Page, testInfo: TestInfo) {
-  if (testInfo.project.name === "manual") {
-    console.log(">>> Click 'Add to cart' in the browser <<<");
-
-    await expect(page.getByTestId("status")).toHaveText(
-      expectedMessage,
-      { timeout: testInfo.timeout },
-    );
-  } else {
-    await page.getByTestId("trigger").click();
-  }
-}
+// Click "Add to cart", or wait for a person to click it in manual mode.
+const clickTrigger = (page: Page, testInfo: TestInfo) =>
+  trigger(page, testInfo, {
+    prompt: ">>> Click 'Add to cart' in the browser <<<",
+    humanDone: (timeout) =>
+      expect(page.getByTestId("status")).toHaveText(expectedMessage, { timeout }),
+  });
 
 test("polite status page loads", async ({ page }) => {
   await page.goto(politeUrl("accessible"));

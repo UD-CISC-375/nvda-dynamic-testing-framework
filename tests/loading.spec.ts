@@ -1,6 +1,7 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
+import { trigger } from "./helpers/trigger";
 
 // The loading indicator scenario on Team Y's site: clicking "Load results"
 // shows a spinner for `delay` ms, then a list of 5 results.
@@ -29,17 +30,11 @@ const busyCleared = (changes: DomChange[]) =>
 
 // Starts loading. In the "chromium" project Playwright clicks for us; in the
 // "manual" project we wait for a person to click in the visible browser.
-async function clickTrigger(page: Page, testInfo: TestInfo) {
-  if (testInfo.project.name === "manual") {
-    console.log(">>> Click the 'Load results' button in the browser window <<<");
-    // This only waits for the human. The watcher still does the detecting.
-    await expect(page.getByTestId("spinner")).toBeVisible({
-      timeout: testInfo.timeout,
-    });
-  } else {
-    await page.getByTestId("trigger").click();
-  }
-}
+const clickTrigger = (page: Page, testInfo: TestInfo) =>
+  trigger(page, testInfo, {
+    prompt: ">>> Click the 'Load results' button in the browser window <<<",
+    humanDone: (timeout) => expect(page.getByTestId("spinner")).toBeVisible({ timeout }),
+  });
 
 test("loading page loads", async ({ page }) => {
   await page.goto(loadingUrl("accessible"));

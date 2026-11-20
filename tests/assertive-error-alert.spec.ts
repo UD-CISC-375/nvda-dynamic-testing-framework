@@ -1,6 +1,7 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
+import { trigger } from "./helpers/trigger";
 
 const alertUrl = (variant: "accessible" | "broken") =>
   `#/live/alert?variant=${variant}&delay=1000`;
@@ -16,18 +17,13 @@ const announced = (text: string) => (changes: DomChange[]) =>
       change.text?.includes(text)
   );
 
-async function clickTrigger(page: Page, testInfo: TestInfo) {
-  if (testInfo.project.name === "manual") {
-    console.log(">>> Click 'Save changes' in the browser <<<");
-
-    await expect(page.getByTestId("error-text")).toHaveText(
-      expectedError,
-      { timeout: testInfo.timeout }
-    );
-  } else {
-    await page.getByTestId("trigger").click();
-  }
-}
+// Click "Save changes", or wait for a person to click it in manual mode.
+const clickTrigger = (page: Page, testInfo: TestInfo) =>
+  trigger(page, testInfo, {
+    prompt: ">>> Click 'Save changes' in the browser <<<",
+    humanDone: (timeout) =>
+      expect(page.getByTestId("error-text")).toHaveText(expectedError, { timeout }),
+  });
 
 
 test("assertive error alert page loads", async ({ page }) => {
