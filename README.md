@@ -145,6 +145,7 @@ tests/
   helpers/
     watch-dom.ts       watchDom(): DOM + focus change recorder
     aria-tree.ts       snapshotTree, waitForTreeChange, diffTree, refOf, attachTreeDiff
+    tree-tracker.ts    createTreeTracker(): follows the tree from one settled state to the next
     axe.ts             runAxe() and diffViolations()
     scenarios.ts       loadScenarios(): reads the test site's scenarios.json
   *.spec.ts            one spec per scenario, plus unit tests for the helpers
