@@ -1,14 +1,13 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
+import { gotoScenario } from "./helpers/scenarios";
 
 // The loading indicator scenario on Team Y's site: clicking "Load results"
 // shows a spinner for `delay` ms, then a list of 5 results.
 // WCAG 2.2 4.1.3 Status Messages: "Loading" and "Loaded" must reach a screen
 // reader without moving focus, i.e. through a live region.
 // delay=3000 holds the loading state long enough to run axe against it.
-const loadingUrl = (variant: "accessible" | "broken") =>
-  `#/live/loading?variant=${variant}&delay=3000`;
 
 // A live-region change whose text contains `text`: what a screen reader
 // announces. axe-core has no rule for 4.1.3, so this is how we check it.
@@ -42,7 +41,7 @@ async function clickTrigger(page: Page, testInfo: TestInfo) {
 }
 
 test("loading page loads", async ({ page }) => {
-  await page.goto(loadingUrl("accessible"));
+  await gotoScenario(page, "live-loading", "accessible", { delay: 3000 });
   await expect(page.getByTestId("variant")).toHaveText("accessible");
 
   // Starting state, before anyone clicks: nothing loading, no results.
@@ -55,7 +54,7 @@ test("loading page loads", async ({ page }) => {
 test("accessible: loading and completion are announced via a live region", async ({
   page,
 }, testInfo) => {
-  await page.goto(loadingUrl("accessible"));
+  await gotoScenario(page, "live-loading", "accessible", { delay: 3000 });
   await expect(page.getByTestId("trigger")).toBeVisible();
 
   // 1. Baseline scan of the page as it loaded.
@@ -92,7 +91,7 @@ test("accessible: loading and completion are announced via a live region", async
 test("broken: loading and completion are NOT announced", async ({
   page,
 }, testInfo) => {
-  await page.goto(loadingUrl("broken"));
+  await gotoScenario(page, "live-loading", "broken", { delay: 3000 });
   await expect(page.getByTestId("trigger")).toBeVisible();
 
   const before = await runAxe(page, testInfo, "before");

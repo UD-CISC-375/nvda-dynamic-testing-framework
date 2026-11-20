@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { runAxe } from "./helpers/axe";
+import { gotoScenario } from "./helpers/scenarios";
 
 // The error summary scenario on Team Y's site. Submitting the form with empty
 // fields should report every error. axe can't see this flaw (nvdaOnly: true):
@@ -7,13 +8,11 @@ import { runAxe } from "./helpers/axe";
 // screen reader about it. So these tests check focus and ARIA wiring directly.
 // accessible should pass on our tests
 // broken will still pass but we are asserting what the failure is and checking
-const errorSummaryUrl = (variant: "accessible" | "broken") =>
-  `#/forms/error-summary?variant=${variant}`;
 
 test("accessible: submitting empty fields moves focus to an error summary", async ({
   page,
 }, testInfo) => {
-  await page.goto(errorSummaryUrl("accessible"));
+  await gotoScenario(page, "forms-summary", "accessible");
 
   const name = page.getByTestId("name");
   const email = page.getByTestId("email");
@@ -64,7 +63,7 @@ test("accessible: submitting empty fields moves focus to an error summary", asyn
 test("broken: errors appear but NVDA is never told about them", async ({
   page,
 }, testInfo) => {
-  await page.goto(errorSummaryUrl("broken"));
+  await gotoScenario(page, "forms-summary", "broken");
 
   const trigger = page.getByTestId("trigger");
   const name = page.getByTestId("name");

@@ -19,7 +19,7 @@ test("loads all scenarios from the manifest", async ({ request }) => {
 
   expect(menu).toBeDefined();
 
-  // Compare against the URL menu.spec.ts currently uses.
+  // Specs read their URLs from the manifest, so pin one: a URL-format change fails here by name.
   expect(menu?.urls.broken).toBe(
     "#/disclosure/menu?variant=broken"
   );

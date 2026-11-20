@@ -1,14 +1,12 @@
 import { test, expect } from "@playwright/test";
 import { runAxe } from "./helpers/axe";
-
-const labelsUrl = (variant: "accessible" | "broken") =>
-  `#/forms/labels?variant=${variant}`;
+import { gotoScenario } from "./helpers/scenarios";
 
 // Single-state check; doesn't trigger interaction/compare DOM changes
 test("accessible: labels expose names, required state, and description", async ({
   page,
 }, testInfo) => {
-  await page.goto(labelsUrl("accessible"));
+  await gotoScenario(page, "forms-labels", "accessible");
 
   // Confirm visible label targets full-name field; accessibility
   // name omits visual required marker, while required/description convey
@@ -35,7 +33,7 @@ test("accessible: labels expose names, required state, and description", async (
 test("broken: visible labels do not provide accessible names", async ({
   page,
 }, testInfo) => {
-  await page.goto(labelsUrl("broken"));
+  await gotoScenario(page, "forms-labels", "broken");
 
   // Text looks like label visually, but neither field gets accessible
   // name from it, and full-name field lacks required/description semantics

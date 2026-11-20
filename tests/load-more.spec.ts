@@ -1,16 +1,15 @@
 
 import { test, expect } from "@playwright/test";
 import { runAxe } from "./helpers/axe";
+import { gotoScenario } from "./helpers/scenarios";
 
 // Team Y's Load More scenario.
 // The longer delay makes the loading message easier to check.
-const loadMoreUrl = (variant: "accessible" | "broken") =>
-  `#/dynamic/load-more?variant=${variant}&delay=3000`;
 
 test("accessible: loading articles announces updates and moves focus", async ({
   page,
 }, testInfo) => {
-  await page.goto(loadMoreUrl("accessible"));
+  await gotoScenario(page, "dynamic-load-more", "accessible", { delay: 3000 });
   await expect(page.getByTestId("variant")).toHaveText("accessible");
 
   const button = page.getByTestId("trigger");
@@ -50,7 +49,7 @@ test("accessible: loading articles announces updates and moves focus", async ({
 test("broken: loading articles does not announce updates or manage focus", async ({
   page,
 }, testInfo) => {
-  await page.goto(loadMoreUrl("broken"));
+  await gotoScenario(page, "dynamic-load-more", "broken", { delay: 3000 });
   await expect(page.getByTestId("variant")).toHaveText("broken");
 
   const button = page.getByTestId("trigger");

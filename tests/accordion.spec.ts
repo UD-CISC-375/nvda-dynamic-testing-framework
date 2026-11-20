@@ -1,6 +1,7 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
+import { gotoScenario } from "./helpers/scenarios";
 
 // The accordion scenario on Team Y's site. The site uses hash routing, so the
 // "page" lives after the # and the server always serves the same index.html.
@@ -8,8 +9,6 @@ import { watchDom, DomChange } from "./helpers/watch-dom";
 // broken will still pass axe (a <div> with text is valid markup), but we are
 // asserting what the failure is: the header is not a button, has no
 // aria-expanded / aria-controls, and the panel opens via an inline style.
-const accordionUrl = (variant: "accessible" | "broken") =>
-  `#/disclosure/accordion?variant=${variant}`;
 
 // The DOM change we're waiting for: the change a screen reader relies on to
 // announce "expanded" and find the panel.
@@ -41,7 +40,7 @@ async function clickTrigger(page: Page, testInfo: TestInfo) {
 }
 
 test("accordion page loads", async ({ page }) => {
-  await page.goto(accordionUrl("accessible"));
+  await gotoScenario(page, "disclosure-accordion", "accessible");
 
   // The site is a React app: the HTML arrives nearly empty and React builds
   // the page afterwards. expect(...) retries until the element shows up
@@ -58,7 +57,7 @@ test("accordion page loads", async ({ page }) => {
 test("accessible: opening the accordion is detected and stays clean", async ({
   page,
 }, testInfo) => {
-  await page.goto(accordionUrl("accessible"));
+  await gotoScenario(page, "disclosure-accordion", "accessible");
   const trigger = page.getByTestId("trigger");
   await expect(trigger).toBeVisible();
 
@@ -97,7 +96,7 @@ test("accessible: opening the accordion is detected and stays clean", async ({
 test("broken: opening the accordion is NOT announced as a state change", async ({
   page,
 }, testInfo) => {
-  await page.goto(accordionUrl("broken"));
+  await gotoScenario(page, "disclosure-accordion", "broken");
   const trigger = page.getByTestId("trigger");
   await expect(trigger).toBeVisible();
 

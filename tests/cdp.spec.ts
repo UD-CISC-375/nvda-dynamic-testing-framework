@@ -2,10 +2,7 @@ import { test, expect, Page, Locator } from "@playwright/test";
 import { createCdpLink, resolveElement, resolveRefs, CdpLink } from "./helpers/cdp-link";
 import { snapshotTree, waitForTreeChange, refOf } from "./helpers/aria-tree";
 import { watchDom } from "./helpers/watch-dom";
-
-// Duplicated from menu.spec.ts on purpose; importing from a spec file would
-// register its tests (same convention as menu-aria-tree.spec.ts).
-const menuUrl = (variant: "accessible" | "broken") => `#/disclosure/menu?variant=${variant}`;
+import { gotoScenario } from "./helpers/scenarios";
 
 // snapshotTree() (aria-tree.ts) takes its "content" and "ai" mode snapshots
 // concurrently via Promise.all. That's fine for reading ref ids as plain
@@ -162,7 +159,7 @@ test(
 test("the menu button's ref resolves to the same backendNodeId before and after the menu opens", async ({
   page,
 }) => {
-  await page.goto(menuUrl("accessible"));
+  await gotoScenario(page, "disclosure-menu", "accessible");
   await expect(page.getByTestId("trigger")).toBeVisible();
 
   const link = await createCdpLink(page);

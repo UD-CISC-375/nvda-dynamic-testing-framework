@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { runAxe } from "./helpers/axe";
+import { gotoScenario } from "./helpers/scenarios";
 
 // The submission confirmation scenario on Team Y's site: sending feedback
 // shows "Sending..." on the button for `delay` ms, then a confirmation.
@@ -7,13 +8,11 @@ import { runAxe } from "./helpers/axe";
 // (the default is 1000 ms).
 // axe can't detect the broken variant's flaw (manifest: nvdaOnly: true), so
 // these tests check the live region and focus directly.
-const submissionConfirmationUrl = (variant: "accessible" | "broken") =>
-  `#/forms/success?variant=${variant}&delay=3000`;
 
 test("accessible: confirmation is announced and focus stays on the button", async ({
   page,
 }, testInfo) => {
-  await page.goto(submissionConfirmationUrl("accessible"));
+  await gotoScenario(page, "forms-success", "accessible", { delay: 3000 });
 
   const status = page.getByRole("status");
   const feedback = page.getByTestId("feedback");
@@ -51,7 +50,7 @@ test("accessible: confirmation is announced and focus stays on the button", asyn
 test("broken: form is replaced, nothing is announced and focus is lost", async ({
   page,
 }, testInfo) => {
-  await page.goto(submissionConfirmationUrl("broken"));
+  await gotoScenario(page, "forms-success", "broken", { delay: 3000 });
 
   // 1. Fill in feedback and send it with the keyboard.
   await page.getByTestId("feedback").fill("Great page");

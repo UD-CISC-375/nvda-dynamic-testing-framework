@@ -2,10 +2,8 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 // Import the helpers that snapshot, diff, wait on, and attach accessibility trees.
 import { snapshotTree, diffTree, waitForTreeChange, attachTreeDiff, refOf } from "./helpers/aria-tree";
-
-// Duplicated from menu.spec.ts on purpose; importing from a spec file would register its tests.
-// Build the hash route for the menu demo page, selecting the accessible or broken variant.
-const menuUrl = (variant: "accessible" | "broken") => `#/disclosure/menu?variant=${variant}`;
+// Import the helper that opens a scenario at its scenarios.json URL.
+import { gotoScenario } from "./helpers/scenarios";
 
 // Open the menu: a human clicks in the "manual" project, otherwise Playwright clicks for us.
 async function clickTrigger(page: Page, testInfo: TestInfo) {
@@ -29,7 +27,7 @@ for (const variant of ["accessible", "broken"] as const) {
   // Define a test whose name includes the variant; receives the page fixture and test metadata.
   test(`${variant}: accessibility-tree diff detects the menu opening`, async ({ page }, testInfo) => {
     // Navigate to the menu demo page for this variant.
-    await page.goto(menuUrl(variant));
+    await gotoScenario(page, "disclosure-menu", variant);
     // Make sure the trigger button has rendered before taking any snapshot.
     await expect(page.getByTestId("trigger")).toBeVisible();
 
@@ -85,7 +83,7 @@ for (const variant of ["accessible", "broken"] as const) {
   // Refs must identify the same element across snapshots, even when its state changes.
   test(`${variant}: menu button keeps the same ref after opening`, async ({ page }, testInfo) => {
     // Navigate to the menu demo page for this variant.
-    await page.goto(menuUrl(variant));
+    await gotoScenario(page, "disclosure-menu", variant);
     // Make sure the trigger button has rendered before taking any snapshot.
     await expect(page.getByTestId("trigger")).toBeVisible();
     // Snapshot the whole page.

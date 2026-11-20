@@ -1,13 +1,12 @@
 import { test, expect, Page, TestInfo } from "@playwright/test";
 import { runAxe, diffViolations } from "./helpers/axe";
 import { watchDom, DomChange } from "./helpers/watch-dom";
+import { gotoScenario } from "./helpers/scenarios";
 
 // The menu scenario on Team Y's site. The site uses hash routing, so the
 // "page" lives after the # and the server always serves the same index.html.
 // accessible should pass on our tests
 // broken will still pass but we are asserting what the failure is and checking
-const menuUrl = (variant: "accessible" | "broken") =>
-  `#/disclosure/menu?variant=${variant}`;
 
 // The DOM change we're waiting for: the change a screen reader relies on to
 // announce "expanded" and find the menu.
@@ -38,7 +37,7 @@ async function clickTrigger(page: Page, testInfo: TestInfo) {
 }
 
 test("menu page loads", async ({ page }) => {
-  await page.goto(menuUrl("accessible"));
+  await gotoScenario(page, "disclosure-menu", "accessible");
 
   // The site is a React app: the HTML arrives nearly empty and React builds
   // the page afterwards. expect(...) retries until the element shows up
@@ -55,7 +54,7 @@ test("menu page loads", async ({ page }) => {
 test("accessible: opening the menu is detected and stays clean", async ({
   page,
 }, testInfo) => {
-  await page.goto(menuUrl("accessible"));
+  await gotoScenario(page, "disclosure-menu", "accessible");
   await expect(page.getByTestId("trigger")).toBeVisible();
 
   // 1. Baseline scan of the page as it loaded.
@@ -81,7 +80,7 @@ test("accessible: opening the menu is detected and stays clean", async ({
 test("broken: opening the menu is NOT announced as a state change", async ({
   page,
 }, testInfo) => {
-  await page.goto(menuUrl("broken"));
+  await gotoScenario(page, "disclosure-menu", "broken");
   await expect(page.getByTestId("trigger")).toBeVisible();
 
   // The broken trigger is an icon-only <button> with no accessible name,
